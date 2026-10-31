@@ -26,22 +26,36 @@ def buat_laporan_word_jurnal(nama_proyek, tanggal, daftar_file, konsep_utama, ha
     font.name = 'Times New Roman'
     font.size = Pt(12)
 
-    # --- PENGAMAN ANTI-CRASH ---
     if not paket_jurnal_ai or not isinstance(paket_jurnal_ai, str):
         doc.add_heading('Gagal Generate Draf Jurnal', 0)
-        doc.add_paragraph("Teks dari AI kosong. Kemungkinan API Key Groq belum diatur, atau koneksi ke AI terputus. Silakan coba lagi dan pastikan API Key sudah benar.")
+        doc.add_paragraph("Teks dari AI kosong. Silakan coba lagi.")
         file_stream = io.BytesIO()
         doc.save(file_stream)
         file_stream.seek(0)
         return file_stream
-    # ---------------------------
 
-    # Hapus metadata internal dan bersihkan Markdown
-    teks_bersih = paket_jurnal_ai.replace("**", "").replace("# ", "").replace("## ", "")
+    # --- PEMBERSIH MARKDOWN & FORMATTING ---
+    teks = paket_jurnal_ai
+    # Hapus karakter escape
+    teks = teks.replace('\\', '')
+    # Hapus bintang (bold/italic)
+    teks = teks.replace('**', '').replace('*', '')
     
-    for baris in teks_bersih.split('\n'):
-        if baris.strip():
-            doc.add_paragraph(baris.strip())
+    for baris in teks.split('\n'):
+        baris = baris.strip()
+        if not baris:
+            continue
+            
+        # Deteksi Heading
+        if baris.startswith('# '):
+            doc.add_heading(baris.replace('# ', '').strip(), level=1)
+        elif baris.startswith('## '):
+            doc.add_heading(baris.replace('## ', '').strip(), level=2)
+        elif baris.startswith('### '):
+            doc.add_heading(baris.replace('### ', '').strip(), level=3)
+        else:
+            # Paragraf biasa
+            doc.add_paragraph(baris)
     
     file_stream = io.BytesIO()
     doc.save(file_stream)
