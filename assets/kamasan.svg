@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="fireGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#e63946"/>
+      <stop offset="50%" stop-color="#f77f00"/>
+      <stop offset="100%" stop-color="#ffd166"/>
+    </linearGradient>
+    <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6a6a6a"/>
+      <stop offset="50%" stop-color="#2b2b2b"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <linearGradient id="anvilGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5a5a5a"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <linearGradient id="brickGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8b3a1f"/>
+      <stop offset="100%" stop-color="#4a1a0a"/>
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd166" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#f77f00" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- === TUNGKU PEMBAKARAN (kiri) === -->
+  <!-- Badan tungku dari bata -->
+  <rect x="40" y="300" width="140" height="140" rx="8" fill="url(#brickGrad)"/>
+  <!-- Baris bata -->
+  <line x1="40" y1="340" x2="180" y2="340" stroke="#2a0a00" stroke-width="2" opacity="0.6"/>
+  <line x1="40" y1="380" x2="180" y2="380" stroke="#2a0a00" stroke-width="2" opacity="0.6"/>
+  <line x1="40" y1="420" x2="180" y2="420" stroke="#2a0a00" stroke-width="2" opacity="0.6"/>
+  <line x1="80" y1="300" x2="80" y2="340" stroke="#2a0a00" stroke-width="2" opacity="0.5"/>
+  <line x1="120" y1="300" x2="120" y2="340" stroke="#2a0a00" stroke-width="2" opacity="0.5"/>
+  <line x1="60" y1="340" x2="60" y2="380" stroke="#2a0a00" stroke-width="2" opacity="0.5"/>
+  <line x1="100" y1="340" x2="100" y2="380" stroke="#2a0a00" stroke-width="2" opacity="0.5"/>
+  <line x1="140" y1="340" x2="140" y2="380" stroke="#2a0a00" stroke-width="2" opacity="0.5"/>
+  <!-- Mulut tungku (lubang api) -->
+  <ellipse cx="110" cy="380" rx="35" ry="25" fill="#1a0500"/>
+  <!-- Bara api di dalam tungku -->
+  <ellipse cx="110" cy="385" rx="28" ry="18" fill="#e63946"/>
+  <ellipse cx="110" cy="383" rx="20" ry="12" fill="#f77f00"/>
+  <ellipse cx="110" cy="381" rx="12" ry="7" fill="#ffd166"/>
+  <!-- Lidah api keluar dari tungku -->
+  <path d="M 110 360 Q 90 320, 105 280 Q 115 310, 120 270 Q 130 310, 140 290 Q 135 330, 125 360 Z" fill="url(#fireGrad)" opacity="0.9"/>
+  <path d="M 110 360 Q 100 330, 110 300 Q 118 325, 120 310 Q 125 335, 118 360 Z" fill="#ffd166" opacity="0.85"/>
+  <!-- Glow di sekitar tungku -->
+  <circle cx="110" cy="340" r="90" fill="url(#glowGrad)" opacity="0.35"/>
+
+  <!-- === LANDASAN (anvil) === -->
+  <path d="M 240 400 L 420 400 L 420 420 L 390 420 L 400 480 L 370 480 L 360 420 L 280 420 L 270 480 L 240 480 L 250 420 L 240 420 Z" fill="url(#anvilGrad)"/>
+  <!-- Motif ukiran Papua di landasan -->
+  <path d="M 270 408 L 290 408 L 280 416 Z" fill="#f4a900" opacity="0.7"/>
+  <path d="M 310 408 L 330 408 L 320 416 Z" fill="#f4a900" opacity="0.7"/>
+  <path d="M 350 408 L 370 408 L 360 416 Z" fill="#f4a900" opacity="0.7"/>
+
+  <!-- === PARANG DI ATAS LANDASAN (sedang ditempa) === -->
+  <!-- Bilah parang -->
+  <path d="M 260 390 L 400 360 L 405 372 L 265 402 Z" fill="url(#metalGrad)"/>
+  <!-- Aksen emas (panas tempaan) di parang -->
+  <path d="M 270 394 L 395 366" stroke="#f4a900" stroke-width="2" opacity="0.9"/>
+  <!-- Ujung parang yang membara (baru keluar dari api) -->
+  <circle cx="268" cy="396" r="6" fill="#ffd166" opacity="0.9"/>
+  <circle cx="268" cy="396" r="3" fill="#fff" opacity="0.8"/>
+
+  <!-- === PALU (sedang diayunkan ke parang) === -->
+  <!-- Gagang palu (miring, seolah diayunkan) -->
+  <rect x="330" y="120" width="20" height="200" rx="6" fill="#8b5a2b" transform="rotate(20 340 220)"/>
+  <!-- Kepala palu -->
+  <path d="M 290 110 L 400 130 L 405 165 L 285 145 Z" fill="url(#metalGrad)" transform="rotate(20 340 140)"/>
+  <rect x="285" y="105" width="120" height="14" rx="4" fill="#3a3a3a" transform="rotate(20 340 112)"/>
+  <!-- Aksen emas di kepala palu -->
+  <rect x="300" y="120" width="90" height="5" fill="#f4a900" opacity="0.85" transform="rotate(20 340 122)"/>
+
+  <!-- === PERCIKAN API DI TITIK TEMPA === -->
+  <circle cx="350" cy="380" r="3" fill="#ffd166" opacity="0.9"/>
+  <circle cx="370" cy="375" r="2.5" fill="#f77f00" opacity="0.85"/>
+  <circle cx="340" cy="372" r="2" fill="#ffd166" opacity="0.8"/>
+  <circle cx="380" cy="370" r="3" fill="#e63946" opacity="0.8"/>
+  <circle cx="360" cy="365" r="2" fill="#ffd166" opacity="0.75"/>
+  <circle cx="390" cy="378" r="2" fill="#f77f00" opacity="0.7"/>
+</svg>
