@@ -21,6 +21,30 @@ from src.ai_helper import (tanya_ai_analisis, dapatkan_client_groq,
 
 st.set_page_config(page_title="Kamasan Analytics", page_icon="🔨", layout="wide")
 
+# --- TAMBAHKAN KODE INI ---
+# Cek jika ada hasil analisis baru di memori, tampilkan
+if 'hasil_baru' in st.session_state:
+    hasil = st.session_state['hasil_baru']
+    st.success("✅ Analisis berhasil disimpan ke Riwayat!")
+    
+    st.subheader(f"🔥 Hasil Tempaan: {hasil['nama']}")
+    col_kiri, col_kanan = st.columns([1, 2])
+    with col_kiri:
+        st.markdown("### 💡 Konsep Utama")
+        for k in hasil['konsep']:
+            st.write(f"- **{k['konsep']}** (Skor: {k['skor']:.2f})")
+    with col_kanan:
+        st.markdown("### 🕸️ Peta Jaringan Konsep")
+        if hasil['pmi']:
+            html_graf = buat_graf_konsep(hasil['pmi'], hasil['konsep'])
+            tampilkan_graf_di_streamlit(html_graf)
+            
+    if st.button("Tutup Hasil Ini & Mulai Baru"):
+        del st.session_state['hasil_baru']
+        st.rerun()
+        
+    st.divider()
+# ---------------------------
 init_db()
 
 # === SIDEBAR ===
@@ -222,7 +246,7 @@ with tab1:
             st.warning("⚠️ Harap isi 'Nama Proyek / Data' di atas.")
         else:
             st.success(f"{len(uploaded_files)} file siap ditempa.")
-            if st.button("🚀 Mulai Tempa Analisis", type="primary"):
+                        if st.button("🚀 Mulai Tempa Analisis", type="primary"):
                 with st.spinner("Menempa data..."):
                     semua_kata, daftar_kata_per_dokumen, nama_file = [], [], []
                     kamus_terbaru = ambil_kamus_lokal()
@@ -239,25 +263,19 @@ with tab1:
                     else:
                         konsep_utama = ekstrak_konsep_utama(daftar_kata_per_dokumen, top_n=15)
                         hasil_pmi = hitung_pmi(semua_kata, min_cooccurrence=5)
+                        
+                        # Simpan ke Database
                         simpan_analisis(nama_proyek_input, nama_file, konsep_utama, hasil_pmi)
                         
-                        st.divider()
-                        st.subheader(f"🔥 Hasil Tempaan: {nama_proyek_input}")
-                        col_kiri, col_kanan = st.columns([1, 2])
-                        with col_kiri:
-                            st.markdown("### 💡 Konsep Utama")
-                            for k in konsep_utama:
-                                st.write(f"- **{k['konsep']}** (Skor: {k['skor']:.2f})")
-                        with col_kanan:
-                            st.markdown("### 🕸️ Peta Jaringan Konsep")
-                            if hasil_pmi:
-                                html_graf = buat_graf_konsep(hasil_pmi, konsep_utama)
-                                tampilkan_graf_di_streamlit(html_graf)
-                        if hasil_pmi:
-                            with st.expander("Lihat Detail Hubungan (PMI)"):
-                                st.dataframe(pd.DataFrame(hasil_pmi), use_container_width=True)
-    else:
-        st.info("Belum ada file.")
+                        # Simpan ke Session State agar bisa ditampilkan setelah rerun
+                        st.session_state['hasil_baru'] = {
+                            "nama": nama_proyek_input,
+                            "konsep": konsep_utama,
+                            "pmi": hasil_pmi
+                        }
+                        
+                        # Paksa Streamlit untuk refresh halaman!
+                        st.rerun()
 
 with tab2:
     st.subheader("🔍 Pencarian Konteks Kata")
