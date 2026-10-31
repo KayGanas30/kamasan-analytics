@@ -13,6 +13,7 @@ from src.database import (init_db, simpan_analisis, ambil_semua_riwayat,
                           ambil_detail_riwayat, ambil_kamus_lokal, 
                           tambah_kamus_lokal, hapus_kamus_lokal, hapus_riwayat)
 from src.reporting import buat_laporan_word, buat_narasi_otomatis
+from src.ai_helper import tanya_ai
 
 st.set_page_config(page_title="Kamasan Analytics", page_icon="🔨", layout="wide")
 
@@ -25,7 +26,7 @@ with st.sidebar:
     # --- SISTEM KEAMANAN ---
     st.markdown("---")
     sandi_admin = st.text_input("🔒 Akses Admin (Kosongkan jika tamu)", type="password", help="Masukkan sandi untuk membuka fitur hapus.")
-    is_admin = (sandi_admin == "kamasan2026") # GANTI SANDI DI SINI JIKA PERLU
+    is_admin = (sandi_admin == "kamasan2026") 
     st.markdown("---")
     
     st.markdown("### Riwayat Tempaan")
@@ -42,7 +43,6 @@ with st.sidebar:
                     st.session_state['view_riwayat'] = r[0]
                     
             with col_hapus:
-                # Hanya tampilkan tombol hapus jika is_admin = True
                 if is_admin:
                     if st.button("🗑️", key=f"del_hist_{r[0]}", help="Hapus riwayat"):
                         hapus_riwayat(r[0])
@@ -50,10 +50,10 @@ with st.sidebar:
                             del st.session_state['view_riwayat']
                         st.rerun()
                 else:
-                    st.write("") # Placeholder agar sejajar
+                    st.write("") 
     
     st.divider()
-    st.caption("Kamasan Analytics v0.4")
+    st.caption("Kamasan Analytics v0.5 (AI Powered)")
 
 # === HEADER ===
 col_logo, col_title = st.columns([1, 8])
@@ -140,11 +140,10 @@ if 'view_riwayat' in st.session_state:
         st.stop()
 
 # === TAB MENU ===
-# Jika admin, tampilkan 3 tab. Jika tamu, hanya 2 tab.
 if is_admin:
-    tab1, tab2, tab3 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah", "🤖 Tanya AI"])
 else:
-    tab1, tab2 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata"])
+    tab1, tab2, tab4 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "🤖 Tanya AI"])
     tab3 = None 
 
 with tab1:
@@ -244,6 +243,48 @@ if tab3 is not None:
                 if col_hapus.button("Hapus 🗑️", key=f"del_kamus_{k}"):
                     hapus_kamus_lokal(k)
                     st.rerun()
+
+# === TAB 4: TANYA AI ===
+with tab4:
+    st.subheader("🤖 Tanya Jawab Dokumen dengan AI")
+    st.write("Unggah dokumen, lalu tanyakan apa pun tentang isi dokumen tersebut. AI akan menjawab berdasarkan teks aslinya.")
+    
+    # Ambil API Key dari brankas Streamlit (secrets.toml)
+    try:
+        api_key_groq = st.secrets["GROQ_API_KEY"]
+    except:
+        api_key_groq = None
+
+    if not api_key_groq:
+        st.warning("⚠️ API Key Groq tidak ditemukan. Pastikan Anda sudah membuat file `.streamlit/secrets.toml`.")
+    else:
+        uploaded_ai = st.file_uploader("Unggah dokumen untuk dianalisis AI (1 file)", type=["txt", "docx", "pdf"], key="ai_upload")
+        
+        if uploaded_ai:
+            teks_dokumen_ai = baca_file(uploaded_ai)
+            
+            if 'chat_history' not in st.session_state:
+                st.session_state.chat_history = []
+
+            # Tampilkan riwayat chat
+            for chat in st.session_state.chat_history:
+                with st.chat_message(chat["role"]):
+                    st.write(chat["content"])
+
+            # Input pertanyaan
+            pertanyaan = st.chat_input("Tanya sesuatu tentang dokumen ini...")
+            
+            if pertanyaan:
+                with st.chat_message("user"):
+                    st.write(pertanyaan)
+                st.session_state.chat_history.append({"role": "user", "content": pertanyaan})
+                
+                with st.spinner("Kamasan AI sedang membaca dokumen..."):
+                    jawaban = tanya_ai(teks_dokumen_ai, pertanyaan, api_key_groq)
+                    
+                with st.chat_message("assistant"):
+                    st.write(jawaban)
+                st.session_state.chat_history.append({"role": "assistant", "content": jawaban})
 
 st.divider()
 st.caption("Kamasan Analytics · Offline-first · Data tetap di perangkat Anda")
