@@ -7,7 +7,6 @@ DB_PATH = "kamasan_data.db"
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    # Update: Menambahkan kolom nama_proyek
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS riwayat_analisis (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -51,7 +50,6 @@ def simpan_analisis(nama_proyek, daftar_file, konsep_utama, hasil_pmi):
 def ambil_semua_riwayat():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    # Update: Ambil nama_proyek
     cursor.execute('SELECT id, nama_proyek, tanggal, daftar_file FROM riwayat_analisis ORDER BY id DESC')
     rows = cursor.fetchall()
     conn.close()
@@ -72,6 +70,14 @@ def ambil_detail_riwayat(id_riwayat):
             "hasil_pmi": json.loads(row[4])
         }
     return None
+
+def hapus_riwayat(id_riwayat):
+    """Menghapus data riwayat berdasarkan ID."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM riwayat_analisis WHERE id = ?', (id_riwayat,))
+    conn.commit()
+    conn.close()
 
 def ambil_kamus_lokal():
     conn = sqlite3.connect(DB_PATH)
