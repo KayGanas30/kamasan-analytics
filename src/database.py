@@ -100,13 +100,15 @@ def ambil_kamus_lokal():
     return [r[0] for r in rows]
 
 def tambah_kamus_lokal(kata_baru):
+    """Menambahkan kata ke kamus. Mengembalikan True jika berhasil, False jika sudah ada."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
-        cursor.execute('INSERT INTO kamus_lokal (kata) VALUES (?)', (kata_baru.lower(),))
+        cursor.execute('INSERT INTO kamus_lokal (kata) VALUES (?)', (kata_baru.lower().strip(),))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
+        # Jika kata sudah ada, jangan lempar error, tapi kembalikan False
         return False
     finally:
         conn.close()
