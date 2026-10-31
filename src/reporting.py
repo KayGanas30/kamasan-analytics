@@ -36,11 +36,8 @@ def buat_laporan_word_jurnal(nama_proyek, tanggal, daftar_file, konsep_utama, ha
 
     # --- PEMBERSIH MARKDOWN & LATEX ---
     teks = paket_jurnal_ai
-    # Hapus karakter escape LaTeX
     teks = teks.replace('\\[', '').replace('\\]', '').replace('\\', '')
-    # Hapus bintang (bold/italic)
     teks = teks.replace('**', '').replace('*', '')
-    # Hapus garis pemisah Markdown
     teks = teks.replace('---', '')
     
     for baris in teks.split('\n'):
@@ -57,14 +54,19 @@ def buat_laporan_word_jurnal(nama_proyek, tanggal, daftar_file, konsep_utama, ha
             doc.add_heading(baris.replace('## ', '').strip(), level=1)
         elif baris.startswith('# '):
             doc.add_heading(baris.replace('# ', '').strip(), level=1)
+        elif baris.lower() == 'title':
+            pass # Skip, karena judul sudah ada
         elif baris.startswith('Title'):
             doc.add_heading(baris.replace('Title', '').strip(), level=0)
-        elif baris.startswith('Abstract'):
+        elif baris.lower() == 'abstract':
             doc.add_heading('Abstract', level=1)
-            sisa = baris.replace('Abstract', '').strip()
-            if sisa: doc.add_paragraph(sisa)
-        elif baris.startswith('Keywords:'):
-            doc.add_paragraph(baris) # Biarkan keywords
+        elif baris.lower().startswith('keywords'):
+            # Gabungkan dengan paragraf sebelumnya jika kosong
+            sisa = baris.replace('Keywords:', '').replace('Keywords', '').strip()
+            if sisa:
+                doc.add_paragraph(f"Keywords: {sisa}")
+            else:
+                doc.add_paragraph("Keywords: ")
         else:
             # Paragraf biasa
             doc.add_paragraph(baris)
