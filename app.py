@@ -5,16 +5,19 @@ import docx
 import io
 import pandas as pd
 import json
+import re
 
 from src.preprocessing import tokenisasi, set_kamus_lokal_global
 from src.extraction import ekstrak_konsep_utama, hitung_pmi
 from src.visualization import buat_graf_konsep, tampilkan_graf_di_streamlit
 from src.database import (init_db, simpan_analisis, ambil_semua_riwayat, 
                           ambil_detail_riwayat, ambil_kamus_lokal, 
-                          tambah_kamus_lokal, hapus_kamus_lokal, hapus_riwayat)
+                          tambah_kamus_lokal, hapus_kamus_lokal, hapus_riwayat,
+                          ambil_pengaturan, simpan_pengaturan)
 from src.reporting import buat_laporan_word_jurnal, buat_narasi_otomatis
-from src.ai_helper import tanya_ai_analisis, dapatkan_client_groq, buat_ringkasan_ai, kategorisasi_konsep_ai, generate_jurnal_package
-from src.ai_helper import tanya_ai
+from src.ai_helper import (tanya_ai_analisis, dapatkan_client_groq, 
+                           buat_ringkasan_ai, kategorisasi_konsep_ai, 
+                           generate_jurnal_package)
 
 st.set_page_config(page_title="Kamasan Analytics", page_icon="🔨", layout="wide")
 
@@ -28,6 +31,15 @@ with st.sidebar:
     st.markdown("---")
     sandi_admin = st.text_input("🔒 Akses Admin (Kosongkan jika tamu)", type="password", help="Masukkan sandi untuk membuka fitur hapus.")
     is_admin = (sandi_admin == "kamasan2026") 
+    st.markdown("---")
+    
+    # --- PENGATURAN AI (API KEY) ---
+    st.markdown("### 🤖 Pengaturan AI")
+    api_key_tersimpan = ambil_pengaturan("groq_api_key", "")
+    api_key_input = st.text_input("Groq API Key:", value=api_key_tersimpan, type="password", help="Dapatkan di console.groq.com")
+    if st.button("Simpan API Key"):
+        simpan_pengaturan("groq_api_key", api_key_input)
+        st.success("API Key disimpan!")
     st.markdown("---")
     
     st.markdown("### Riwayat Tempaan")
@@ -54,7 +66,7 @@ with st.sidebar:
                     st.write("") 
     
     st.divider()
-    st.caption("Kamasan Analytics v0.5 (AI Powered)")
+    st.caption("Kamasan Analytics v0.6 (AI Powered)")
 
 # === HEADER ===
 col_logo, col_title = st.columns([1, 8])
@@ -95,6 +107,8 @@ if 'view_riwayat' in st.session_state:
             st.rerun()
             
         narasi = buat_narasi_otomatis(nama_proyek, detail['daftar_file'], detail['konsep_utama'], detail['hasil_pmi'])
+        
+        # --- GENERATOR JURNAL ---
         st.divider()
         st.markdown("### 🎓 Generator Artikel Jurnal (Scopus Q1/Q2)")
         st.write("Gunakan AI untuk merumuskan judul, abstrak, dan rekomendasi reviewer untuk jurnal hukum internasional.")
@@ -107,7 +121,6 @@ if 'view_riwayat' in st.session_state:
         if 'paket_jurnal_ai' in st.session_state:
             st.info(st.session_state['paket_jurnal_ai'])
             
-            # Tombol Download Word Khusus Jurnal
             word_jurnal = buat_laporan_word_jurnal(
                 nama_proyek, detail['tanggal'], detail['daftar_file'], 
                 detail['konsep_utama'], detail['hasil_pmi'], 
@@ -120,15 +133,13 @@ if 'view_riwayat' in st.session_state:
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 type="primary"
             )
-        st.divider()
         
-        st.markdown("### 📊 Tabel PMI")
-        # (Kode tabel PMI ke bawah biarkan seperti sebelumnya)
+        # --- KESIMPULAN & VISUALISASI ---
+        st.divider()
         st.markdown("### 📝 Kesimpulan Eksekutif")
         st.info(narasi)
         
         st.divider()
-            
         col_kiri, col_kanan = st.columns([1, 2])
         with col_kiri:
             st.markdown("### 💡 Konsep Utama")
@@ -148,6 +159,7 @@ if 'view_riwayat' in st.session_state:
         df_pmi = pd.DataFrame(detail['hasil_pmi'])
         st.dataframe(df_pmi, use_container_width=True)
         
+        # --- TOMBOL DOWNLOAD ---
         col_dl1, col_dl2, col_dl3 = st.columns(3)
         with col_dl1:
             laporan_md = f"# Laporan: {nama_proyek}\nTanggal: {detail['tanggal']}\n\n"
@@ -155,12 +167,16 @@ if 'view_riwayat' in st.session_state:
             laporan_md += f"## Konsep Utama\n"
             for k in detail['konsep_utama']: laporan_md += f"- {k['konsep']}\n"
             laporan_md += "\n## Tabel PMI\n" + df_pmi.to_markdown(index=False)
-            
             st.download_button("⬇️ Laporan (Markdown)", laporan_md, f"Laporan_{nama_file_aman}.md", "text/markdown")
             
         with col_dl2:
-            word_file = buat_laporan_word(nama_proyek, detail['tanggal'], detail['daftar_file'], detail['konsep_utama'], detail['hasil_pmi'])
-            st.download_button("⬇️ Laporan (Word)", word_file, f"Laporan_{nama_file_aman}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            # Tombol Word lama kita ganti dengan yang baru (Jurnal)
+            word_file = buat_laporan_word_jurnal(
+                nama_proyek, detail['tanggal'], detail['daftar_file'], 
+                detail['konsep_utama'], detail['hasil_pmi'], 
+                "Laporan Standar (Non-AI). Klik tombol Generator Jurnal di atas untuk draf AI."
+            )
+            st.download_button("⬇️ Laporan Standar (Word)", word_file, f"Laporan_{nama_file_aman}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             
         with col_dl3:
             csv_data = df_pmi.to_csv(index=False).encode('utf-8')
@@ -253,8 +269,6 @@ if tab3 is not None:
         
         if st.button("🚀 Impor Semua ke Kamus", type="primary"):
             if teks_massal:
-                import re
-                # Memisahkan teks berdasarkan koma, enter, atau spasi
                 daftar_kata = re.split(r'[,\n\s]+', teks_massal)
                 daftar_kata = [k.strip().lower() for k in daftar_kata if k.strip()]
                 
@@ -301,47 +315,38 @@ if tab3 is not None:
                 if col_hapus.button("Hapus 🗑️", key=f"del_kamus_{k}"):
                     hapus_kamus_lokal(k)
                     st.rerun()
+
 # === TAB 4: TANYA AI ===
 with tab4:
     st.subheader("🤖 Tanya Jawab Dokumen dengan AI")
-    st.write("Unggah dokumen, lalu tanyakan apa pun tentang isi dokumen tersebut. AI akan menjawab berdasarkan teks aslinya.")
+    st.write("Ajukan pertanyaan tentang hasil analisis dokumen yang sedang dibuka, atau unggah dokumen baru.")
     
-    # Ambil API Key dari brankas Streamlit (secrets.toml)
-    try:
-        api_key_groq = st.secrets["GROQ_API_KEY"]
-    except:
-        api_key_groq = None
-
-    if not api_key_groq:
-        st.warning("⚠️ API Key Groq tidak ditemukan. Pastikan Anda sudah membuat file `.streamlit/secrets.toml`.")
-    else:
-        uploaded_ai = st.file_uploader("Unggah dokumen untuk dianalisis AI (1 file)", type=["txt", "docx", "pdf"], key="ai_upload")
+    # Cek apakah ada riwayat yang sedang dibuka
+    if 'view_riwayat' in st.session_state:
+        id_riwayat = st.session_state['view_riwayat']
+        detail = ambil_detail_riwayat(id_riwayat)
         
-        if uploaded_ai:
-            teks_dokumen_ai = baca_file(uploaded_ai)
+        if detail:
+            st.info(f"Konteks aktif: **{detail['nama_proyek']}**")
+            pertanyaan = st.text_area("Pertanyaan Anda:", placeholder="Contoh: Mengapa konsep 'adat' sangat penting dalam dokumen ini?")
             
-            if 'chat_history' not in st.session_state:
-                st.session_state.chat_history = []
-
-            # Tampilkan riwayat chat
-            for chat in st.session_state.chat_history:
-                with st.chat_message(chat["role"]):
-                    st.write(chat["content"])
-
-            # Input pertanyaan
-            pertanyaan = st.chat_input("Tanya sesuatu tentang dokumen ini...")
-            
-            if pertanyaan:
-                with st.chat_message("user"):
-                    st.write(pertanyaan)
-                st.session_state.chat_history.append({"role": "user", "content": pertanyaan})
-                
-                with st.spinner("Kamasan AI sedang membaca dokumen..."):
-                    jawaban = tanya_ai(teks_dokumen_ai, pertanyaan, api_key_groq)
-                    
-                with st.chat_message("assistant"):
-                    st.write(jawaban)
-                st.session_state.chat_history.append({"role": "assistant", "content": jawaban})
+            if st.button("Kirim ke AI", type="primary"):
+                if pertanyaan:
+                    with st.spinner("Kamasan AI sedang berpikir..."):
+                        jawaban = tanya_ai_analisis(
+                            pertanyaan, 
+                            detail['nama_proyek'], 
+                            detail['konsep_utama'], 
+                            detail['hasil_pmi']
+                        )
+                        st.markdown("### Jawaban AI:")
+                        st.success(jawaban)
+                else:
+                    st.warning("Silakan ketik pertanyaan terlebih dahulu.")
+        else:
+            st.warning("Data riwayat tidak ditemukan.")
+    else:
+        st.info("💡 Silakan buka salah satu **Riwayat Tempaan** di sidebar terlebih dahulu, lalu kembali ke tab ini untuk bertanya.")
 
 st.divider()
 st.caption("Kamasan Analytics · Offline-first · Data tetap di perangkat Anda")
