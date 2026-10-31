@@ -134,51 +134,113 @@ if 'view_riwayat' in st.session_state:
         
         # --- ACADEMIC CO-PILOT (GENERATOR JURNAL) ---
         st.divider()
-        st.markdown("### 🤖 Academic Co-Pilot (Generator Jurnal)")
-        st.write("Ubah hasil analisis ini menjadi draf jurnal siap publikasi (Format IMRaD) yang sesuai dengan target jurnal Anda.")
+                # --- ACADEMIC CO-PILOT (SUITE) ---
+        st.divider()
+        st.markdown("### 🤖 Academic Co-Pilot (Suite)")
         
         api_key_cek = ambil_pengaturan("groq_api_key", "")
         if not api_key_cek:
             st.error("⚠️ API Key Groq belum diatur. Silakan atur di sidebar kiri terlebih dahulu.")
         else:
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                target_jurnal = st.text_input("Target Jurnal:", placeholder="misal: Jurnal Hukum Internasional")
-            with col2:
-                bidang_ilmu = st.text_input("Bidang Ilmu:", placeholder="misal: Hukum Tata Negara")
-            with col3:
-                sudut_pandang = st.text_input("Sudut Pandang/Teori:", placeholder="misal: Teori Otonomi Daerah")
-                
-            if st.button("✨ Generate Draf Jurnal & Opsi Ide", type="primary"):
-                if not target_jurnal:
-                    st.warning("Harap isi Target Jurnal terlebih dahulu.")
-                else:
-                    with st.spinner("Professor AI sedang menganalisis dan menyusun draf jurnal..."):
-                        paket_jurnal = buat_paket_jurnal_lengkap(
-                            nama_proyek, 
-                            detail['konsep_utama'], 
-                            detail['hasil_pmi'],
-                            target_jurnal,
-                            bidang_ilmu,
-                            sudut_pandang
-                        )
-                        st.session_state['paket_jurnal_ai'] = paket_jurnal
+            # Membuat Tab di dalam Halaman Riwayat
+            co_tab1, co_tab2, co_tab3, co_tab4 = st.tabs(["📝 Generator Draf", "📚 Referensi Riil", "🧐 Review Jurnal", "🔍 Cek Plagiarisme"])
+            
+            with co_tab1:
+                st.write("Ubah hasil analisis ini menjadi draf jurnal siap publikasi (Format IMRaD).")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    target_jurnal = st.text_input("Target Jurnal:", placeholder="misal: Jurnal Hukum Internasional")
+                with col2:
+                    bidang_ilmu = st.text_input("Bidang Ilmu:", placeholder="misal: Hukum Tata Negara")
+                with col3:
+                    sudut_pandang = st.text_input("Sudut Pandang/Teori:", placeholder="misal: Teori Otonomi Daerah")
+                    
+                if st.button("✨ Generate Opsi Ide", type="primary"):
+                    if not target_jurnal:
+                        st.warning("Harap isi Target Jurnal terlebih dahulu.")
+                    else:
+                        with st.spinner("Professor AI sedang menganalisis..."):
+                            paket_jurnal = buat_paket_jurnal_lengkap(
+                                nama_proyek, 
+                                detail['konsep_utama'], 
+                                detail['hasil_pmi'],
+                                target_jurnal,
+                                bidang_ilmu,
+                                sudut_pandang
+                            )
+                            st.session_state['paket_jurnal_ai'] = paket_jurnal
+                            
+                if 'paket_jurnal_ai' in st.session_state and st.session_state['paket_jurnal_ai']:
+                    st.markdown(st.session_state['paket_jurnal_ai'])
+                    
+                    st.markdown("### Pilih Opsi & Buat Draf Final")
+                    opsi_terpilih = st.text_area("Salin-tempel Opsi Ide yang Anda pilih di sini:", height=100)
+                    
+                    if st.button("🚀 Buat Draf Final IMRaD"):
+                        with st.spinner("Menulis draf final..."):
+                            draf_final = pilih_opsi_dan_buat_draf(
+                                nama_proyek, detail['konsep_utama'], detail['hasil_pmi'],
+                                target_jurnal, bidang_ilmu, sudut_pandang, opsi_terpilih
+                            )
+                            st.session_state['draf_final'] = draf_final
+                            
+                if 'draf_final' in st.session_state and st.session_state['draf_final']:
+                    st.markdown("### 📄 Draf Artikel Final")
+                    st.info(st.session_state['draf_final'])
+                    
+                    word_jurnal = buat_laporan_word_jurnal(
+                        nama_proyek, detail['tanggal'], detail['daftar_file'], 
+                        detail['konsep_utama'], detail['hasil_pmi'], 
+                        st.session_state['draf_final']
+                    )
+                    st.download_button(
+                        label="⬇️ Download Draf Jurnal Lengkap (Word)",
+                        data=word_jurnal,
+                        file_name=f"Draf_Jurnal_{nama_file_aman}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        type="primary"
+                    )
+            
+            with co_tab2:
+                st.write("Cari referensi riil dari database akademik global (Semantic Scholar).")
+                if st.button("🔎 Cari Referensi untuk Konsep Ini"):
+                    with st.spinner("Mencari referensi..."):
+                        referensi = cari_referensi_riil(detail['konsep_utama'])
+                        st.markdown(referensi)
                         
-            if 'paket_jurnal_ai' in st.session_state and st.session_state['paket_jurnal_ai']:
-                st.markdown(st.session_state['paket_jurnal_ai'])
+            with co_tab3:
+                st.write("Minta AI untuk mereview draf jurnal Anda seolah-olah dia adalah Reviewer Jurnal Scopus.")
+                if 'draf_final' in st.session_state and st.session_state['draf_final']:
+                    if st.button("🧐 Review Draf Jurnal Ini"):
+                        with st.spinner("Reviewer AI sedang membaca draf..."):
+                            review = review_jurnal_otomatis(st.session_state['draf_final'], target_jurnal)
+                            st.session_state['review_ai'] = review
+                            
+                    if 'review_ai' in st.session_state:
+                        st.markdown(st.session_state['review_ai'])
+                else:
+                    st.warning("Silakan buat Draf Final di Tab 'Generator Draf' terlebih dahulu.")
+                    
+            with co_tab4:
+                st.write("Cek kemiripan draf Anda dengan riwayat analisis sebelumnya (Cosine Similarity).")
+                riwayat_lain = ambil_semua_riwayat()
+                opsi_riwayat = {f"{r[1]} ({r[2][:10]})": r[0] for r in riwayat_lain if r[0] != id_riwayat}
                 
-                word_jurnal = buat_laporan_word_jurnal(
-                    nama_proyek, detail['tanggal'], detail['daftar_file'], 
-                    detail['konsep_utama'], detail['hasil_pmi'], 
-                    st.session_state['paket_jurnal_ai']
-                )
-                st.download_button(
-                    label="⬇️ Download Draf Jurnal Lengkap (Word)",
-                    data=word_jurnal,
-                    file_name=f"Draf_Jurnal_{nama_file_aman}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    type="primary"
-                )
+                if not opsi_riwayat:
+                    st.info("Belum ada riwayat lain untuk dibandingkan.")
+                else:
+                    pilihan_banding = st.selectbox("Pilih Riwayat Pembanding:", list(opsi_riwayat.keys()))
+                    if st.button("🔍 Cek Kemiripan"):
+                        if 'draf_final' in st.session_state and st.session_state['draf_final']:
+                            with st.spinner("Menghitung kemiripan..."):
+                                hasil_cek = cek_plagiarisme_dasar(
+                                    st.session_state['draf_final'], 
+                                    opsi_riwayat[pilihan_banding]
+                                )
+                                st.info(hasil_cek)
+                        else:
+                            st.warning("Silakan buat Draf Final di Tab 'Generator Draf' terlebih dahulu.")
+                            
         st.divider()
         
         # --- KESIMPULAN & VISUALISASI ---
