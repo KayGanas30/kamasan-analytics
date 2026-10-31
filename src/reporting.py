@@ -34,12 +34,14 @@ def buat_laporan_word_jurnal(nama_proyek, tanggal, daftar_file, konsep_utama, ha
         file_stream.seek(0)
         return file_stream
 
-    # --- PEMBERSIH MARKDOWN & FORMATTING ---
+    # --- PEMBERSIH MARKDOWN & LATEX ---
     teks = paket_jurnal_ai
-    # Hapus karakter escape
-    teks = teks.replace('\\', '')
+    # Hapus karakter escape LaTeX
+    teks = teks.replace('\\[', '').replace('\\]', '').replace('\\', '')
     # Hapus bintang (bold/italic)
     teks = teks.replace('**', '').replace('*', '')
+    # Hapus garis pemisah Markdown
+    teks = teks.replace('---', '')
     
     for baris in teks.split('\n'):
         baris = baris.strip()
@@ -47,12 +49,22 @@ def buat_laporan_word_jurnal(nama_proyek, tanggal, daftar_file, konsep_utama, ha
             continue
             
         # Deteksi Heading
-        if baris.startswith('# '):
-            doc.add_heading(baris.replace('# ', '').strip(), level=1)
-        elif baris.startswith('## '):
-            doc.add_heading(baris.replace('## ', '').strip(), level=2)
+        if baris.startswith('#### '):
+            doc.add_heading(baris.replace('#### ', '').strip(), level=3)
         elif baris.startswith('### '):
-            doc.add_heading(baris.replace('### ', '').strip(), level=3)
+            doc.add_heading(baris.replace('### ', '').strip(), level=2)
+        elif baris.startswith('## '):
+            doc.add_heading(baris.replace('## ', '').strip(), level=1)
+        elif baris.startswith('# '):
+            doc.add_heading(baris.replace('# ', '').strip(), level=1)
+        elif baris.startswith('Title'):
+            doc.add_heading(baris.replace('Title', '').strip(), level=0)
+        elif baris.startswith('Abstract'):
+            doc.add_heading('Abstract', level=1)
+            sisa = baris.replace('Abstract', '').strip()
+            if sisa: doc.add_paragraph(sisa)
+        elif baris.startswith('Keywords:'):
+            doc.add_paragraph(baris) # Biarkan keywords
         else:
             # Paragraf biasa
             doc.add_paragraph(baris)
