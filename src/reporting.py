@@ -4,7 +4,6 @@ import io
 import pandas as pd
 
 def buat_narasi_otomatis(nama_proyek, daftar_file, konsep_utama, hasil_pmi):
-    # (Biarkan kode narasi otomatis yang lama di sini, tidak perlu diubah)
     if not konsep_utama or not hasil_pmi:
         return "Analisis belum menghasilkan cukup data."
     top_konsep = [k['konsep'] for k in konsep_utama[:3]]
