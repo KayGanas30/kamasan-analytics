@@ -26,13 +26,19 @@ def buat_laporan_word_jurnal(nama_proyek, tanggal, daftar_file, konsep_utama, ha
     font.name = 'Times New Roman'
     font.size = Pt(12)
 
-    # Hapus metadata internal, langsung ke konten
-    # doc.add_heading('Draf Artikel Jurnal Internasional', 0) # Boleh ada atau tidak
-    
-    # Bersihkan Markdown dari AI
+    # --- PENGAMAN ANTI-CRASH ---
+    if not paket_jurnal_ai or not isinstance(paket_jurnal_ai, str):
+        doc.add_heading('Gagal Generate Draf Jurnal', 0)
+        doc.add_paragraph("Teks dari AI kosong. Kemungkinan API Key Groq belum diatur, atau koneksi ke AI terputus. Silakan coba lagi dan pastikan API Key sudah benar.")
+        file_stream = io.BytesIO()
+        doc.save(file_stream)
+        file_stream.seek(0)
+        return file_stream
+    # ---------------------------
+
+    # Hapus metadata internal
     teks_bersih = paket_jurnal_ai.replace("**", "").replace("# ", "").replace("## ", "")
     
-    # Pisahkan per baris dan masukkan ke Word
     for baris in teks_bersih.split('\n'):
         if baris.strip():
             doc.add_paragraph(baris.strip())
