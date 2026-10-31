@@ -1,3 +1,7 @@
+import matplotlib.pyplot as plt
+from io import BytesIO
+from collections import Counter
+import random
 from pyvis.network import Network
 import streamlit as st
 import streamlit.components.v1 as components
@@ -9,6 +13,7 @@ KATA_POLITIK = {"otonomi", "khusus", "pemerintahan", "dewan", "perwakilan", "par
 KATA_ADAT = {"adat", "masyarakat", "asli", "orang", "papua", "noken", "budaya", "suku", "kepala", "honai", "kariwari", "biak", "asmat", "musyawarah", "papuans", "oap"}
 
 def buat_graf_konsep(hasil_pmi, konsep_utama, simpan_ke_file=None):
+    """Membuat visualisasi jaringan interaktif dengan PyVis."""
     if not hasil_pmi:
         return None
 
@@ -72,6 +77,58 @@ def buat_graf_konsep(hasil_pmi, konsep_utama, simpan_ke_file=None):
         return None
 
 def tampilkan_graf_di_streamlit(html_data):
+    """Menampilkan HTML PyVis di Streamlit."""
     if html_data:
+        # Perbaikan: teks terbalik dan ukuran
         html_data = html_data.replace("</head>", "<style>canvas { transform: none !important; }</style></head>")
         components.html(html_data, height=620)
+
+def buat_word_cloud(semua_kata, lebar=10, tinggi=5):
+    """Membuat gambar Word Cloud manual menggunakan Matplotlib (tanpa compiler)."""
+    if not semua_kata:
+        return None
+    
+    # Hitung frekuensi kata
+    freq = Counter(semua_kata)
+    top_kata = freq.most_common(50) # Ambil 50 kata teratas
+    
+    if not top_kata:
+        return None
+
+    # Setup figure
+    fig, ax = plt.subplots(figsize=(lebar, tinggi))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis('off')
+    
+    # Warna khas Kamasan (Emas, Merah, Abu, Biru)
+    colors = ['#f4a900', '#e63946', '#457b9d', '#333333', '#b37b00', '#a4161a']
+    
+    # Posisi acak agar tidak tumpang tindih
+    posisi_x = [random.uniform(0.1, 0.9) for _ in range(len(top_kata))]
+    posisi_y = [random.uniform(0.1, 0.9) for _ in range(len(top_kata))]
+    
+    max_freq = top_kata[0][1]
+    
+    for i, (kata, f) in enumerate(top_kata):
+        # Ukuran font berdasarkan frekuensi
+        ukuran = (f / max_freq) * 60 + 10 
+        warna = random.choice(colors)
+        
+        ax.text(
+            posisi_x[i], posisi_y[i], 
+            kata, 
+            fontsize=ukuran, 
+            color=warna, 
+            ha='center', 
+            va='center',
+            alpha=0.8,
+            fontweight='bold'
+        )
+    
+    # Simpan ke bytes
+    img_buffer = BytesIO()
+    plt.savefig(img_buffer, format='png', bbox_inches='tight', transparent=True)
+    plt.close(fig)
+    img_buffer.seek(0)
+    return img_buffer.getvalue()
