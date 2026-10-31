@@ -18,9 +18,16 @@ st.set_page_config(page_title="Kamasan Analytics", page_icon="🔨", layout="wid
 
 init_db()
 
-# === SIDEBAR (Hanya Riwayat) ===
+# === SIDEBAR ===
 with st.sidebar:
     st.image("assets/kamasan.png", width=80)
+    
+    # --- SISTEM KEAMANAN ---
+    st.markdown("---")
+    sandi_admin = st.text_input("🔒 Akses Admin (Kosongkan jika tamu)", type="password", help="Masukkan sandi untuk membuka fitur hapus.")
+    is_admin = (sandi_admin == "kamasan2026") # GANTI SANDI DI SINI JIKA PERLU
+    st.markdown("---")
+    
     st.markdown("### Riwayat Tempaan")
     riwayat = ambil_semua_riwayat()
     if not riwayat:
@@ -29,18 +36,24 @@ with st.sidebar:
         for r in riwayat:
             proyek_name = r[1] if r[1] else "Tanpa Nama"
             col_buka, col_hapus = st.columns([0.85, 0.15])
+            
             with col_buka:
                 if st.button(f"📁 {proyek_name}\n({r[2][:10]})", key=f"btn_{r[0]}", use_container_width=True):
                     st.session_state['view_riwayat'] = r[0]
+                    
             with col_hapus:
-                if st.button("🗑️", key=f"del_hist_{r[0]}"):
-                    hapus_riwayat(r[0])
-                    if 'view_riwayat' in st.session_state and st.session_state['view_riwayat'] == r[0]:
-                        del st.session_state['view_riwayat']
-                    st.rerun()
+                # Hanya tampilkan tombol hapus jika is_admin = True
+                if is_admin:
+                    if st.button("🗑️", key=f"del_hist_{r[0]}", help="Hapus riwayat"):
+                        hapus_riwayat(r[0])
+                        if 'view_riwayat' in st.session_state and st.session_state['view_riwayat'] == r[0]:
+                            del st.session_state['view_riwayat']
+                        st.rerun()
+                else:
+                    st.write("") # Placeholder agar sejajar
     
     st.divider()
-    st.caption("Kamasan Analytics v0.3")
+    st.caption("Kamasan Analytics v0.4")
 
 # === HEADER ===
 col_logo, col_title = st.columns([1, 8])
@@ -54,7 +67,6 @@ with col_title:
 st.divider()
 
 def baca_file(uploaded_file):
-    # (Fungsi baca_file tetap sama seperti sebelumnya)
     teks = ""
     if uploaded_file.name.endswith('.txt'):
         teks = uploaded_file.read().decode("utf-8")
@@ -69,7 +81,6 @@ def baca_file(uploaded_file):
 
 # === HALAMAN RIWAYAT ===
 if 'view_riwayat' in st.session_state:
-    # (Blok kode halaman riwayat tetap sama seperti sebelumnya)
     id_riwayat = st.session_state['view_riwayat']
     detail = ambil_detail_riwayat(id_riwayat)
     
@@ -129,10 +140,14 @@ if 'view_riwayat' in st.session_state:
         st.stop()
 
 # === TAB MENU ===
-tab1, tab2, tab3 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah"])
+# Jika admin, tampilkan 3 tab. Jika tamu, hanya 2 tab.
+if is_admin:
+    tab1, tab2, tab3 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah"])
+else:
+    tab1, tab2 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata"])
+    tab3 = None 
 
 with tab1:
-    # (Kode Tab 1 tetap sama)
     st.subheader("Unggah Dokumen & Beri Nama")
     nama_proyek_input = st.text_input("🏷️ Nama Proyek / Data (Wajib):", placeholder="Contoh: Analisis UU Otsus 2021")
     uploaded_files = st.file_uploader("Pilih file", type=["txt", "docx", "pdf"], accept_multiple_files=True)
@@ -180,7 +195,6 @@ with tab1:
         st.info("Belum ada file.")
 
 with tab2:
-    # (Kode Tab 2 tetap sama)
     st.subheader("🔍 Pencarian Konteks Kata")
     uploaded_search = st.file_uploader("Unggah file untuk dicari", type=["txt", "docx", "pdf"])
     kata_dicari = st.text_input("Masukkan kata")
@@ -198,38 +212,38 @@ with tab2:
             else:
                 st.warning(f"Kata '{kata_dicari}' tidak ditemukan.")
 
-with tab3:
-    # (Kode Tab 3 - Kamus Istilah)
-    st.subheader("📖 Kamus Istilah Lokal")
-    st.write("Tambahkan istilah khusus (seperti nama marga, nama tempat, atau bahasa daerah) agar sistem tidak membuangnya saat analisis.")
-    
-    col_input, col_btn = st.columns([3, 1])
-    with col_input:
-        kata_baru = st.text_input("Tambah istilah baru:", placeholder="Contoh: wamena, Dani, noken")
-    with col_btn:
-        st.write("") 
-        st.write("")
-        if st.button("➕ Tambah", use_container_width=True):
-            if kata_baru:
-                if tambah_kamus_lokal(kata_baru):
-                    st.success(f"Istilah '{kata_baru}' berhasil ditambahkan!")
+if tab3 is not None:
+    with tab3:
+        st.subheader("📖 Kamus Istilah Lokal")
+        st.write("Tambahkan istilah khusus (seperti nama marga, nama tempat, atau bahasa daerah) agar sistem tidak membuangnya saat analisis.")
+        
+        col_input, col_btn = st.columns([3, 1])
+        with col_input:
+            kata_baru = st.text_input("Tambah istilah baru:", placeholder="Contoh: wamena, Dani, noken")
+        with col_btn:
+            st.write("") 
+            st.write("")
+            if st.button("➕ Tambah", use_container_width=True):
+                if kata_baru:
+                    if tambah_kamus_lokal(kata_baru):
+                        st.success(f"Istilah '{kata_baru}' berhasil ditambahkan!")
+                        st.rerun()
+                    else:
+                        st.warning(f"Istilah '{kata_baru}' sudah ada.")
+                        
+        st.divider()
+        
+        st.markdown("### Daftar Istilah Saat Ini")
+        kamus_sekarang = ambil_kamus_lokal()
+        if not kamus_sekarang:
+            st.info("Kamus masih kosong.")
+        else:
+            for k in kamus_sekarang:
+                col_kata, col_hapus = st.columns([4, 1])
+                col_kata.write(f"• **{k.capitalize()}**")
+                if col_hapus.button("Hapus 🗑️", key=f"del_kamus_{k}"):
+                    hapus_kamus_lokal(k)
                     st.rerun()
-                else:
-                    st.warning(f"Istilah '{kata_baru}' sudah ada.")
-                    
-    st.divider()
-    
-    st.markdown("### Daftar Istilah Saat Ini")
-    kamus_sekarang = ambil_kamus_lokal()
-    if not kamus_sekarang:
-        st.info("Kamus masih kosong.")
-    else:
-        for k in kamus_sekarang:
-            col_kata, col_hapus = st.columns([4, 1])
-            col_kata.write(f"• **{k.capitalize()}**")
-            if col_hapus.button("Hapus 🗑️", key=f"del_kamus_{k}"):
-                hapus_kamus_lokal(k)
-                st.rerun()
 
 st.divider()
 st.caption("Kamasan Analytics · Offline-first · Data tetap di perangkat Anda")
