@@ -118,3 +118,45 @@ Tolong buatkan paket publikasi dalam format berikut (JANGAN gunakan bullet point
         return response.choices[0].message.content
     except Exception as e:
         return f"Gagal membuat paket jurnal: {e}"
+def buat_paket_jurnal_lengkap(nama_proyek, konsep_utama, hasil_pmi, target_jurnal, bidang_ilmu, sudut_pandang):
+    """Menghasilkan opsi ide, temuan, dan draf IMRaD (Co-Pilot)."""
+    client = dapatkan_client_groq()
+    if not client:
+        return "API Key Groq belum diatur."
+        
+    konteks_konsep = ", ".join([k['konsep'] for k in konsep_utama[:15]])
+    konteks_pmi = "\n".join([f"- {p['kata_a']} berhubungan dengan {p['kata_b']} (Frek: {p['frekuensi']})" for p in hasil_pmi[:10]])
+
+    prompt = f"""Anda adalah seorang Professor dan Editor Jurnal Internasional Bereputasi (Scopus Q1/Q2).
+Saya memiliki hasil analisis teks dari data survei/penelitian berjudul '{nama_proyek}'.
+Data yang ditemukan:
+Konsep Utama: {konteks_konsep}
+Hubungan Konsep (PMI): 
+{konteks_pmi}
+
+Target Jurnal: {target_jurnal}
+Bidang Ilmu: {bidang_ilmu}
+Sudut Pandang Teori: {sudut_pandang}
+
+Tugas Anda:
+1. **OPSI IDE & NOVELTY**: Berikan 3 Opsi Ide Penelitian/Judul Artikel beserta penjelasan singkat "Apa Kebaruan (Novelty)-nya?" untuk masing-masing opsi. (Agar dosen bisa memilih).
+2. **STRUKTUR DRAF JURNAL STANDAR (IMRaD)**: Berdasarkan Opsi Ide Terbaik (beri label "REKOMENDASI UTAMA"), buatkan draf jurnal dengan struktur:
+   - **Title**: Judul bahasa Inggris yang *publishable*.
+   - **Abstract**: 1 paragraf (150-200 kata).
+   - **Introduction**: Latar belakang, masalah, dan tujuan.
+   - **Methodology**: Jelaskan bahwa analisis menggunakan pendekatan kuantitatif-kualitatif (sebutkan *Text Mining/PMI* sebagai metode bantuan).
+   - **Results & Discussion**: Narasikan temuan dari tabel PMI dan Konsep Utama ke dalam bahasa akademik. Hubungkan dengan teori.
+   - **Conclusion**: Kesimpulan dan saran.
+3. **CHECKLIST REVIEWER**: Berikan 3 catatan (Reviewer Notes) apa saja yang harus diperbaiki dosen agar sesuai dengan kriteria `{target_jurnal}`.
+
+Tulis dalam bahasa Indonesia yang sangat formal, akademis, dan siap dipublikasikan. Gunakan format Heading untuk setiap bagian."""
+    
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="openai/gpt-oss-120b",
+            temperature=0.5
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Gagal membuat paket jurnal: {e}"
