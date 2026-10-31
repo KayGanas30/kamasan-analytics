@@ -294,3 +294,39 @@ def cek_plagiarisme_dasar(teks_baru, id_riwayat_lama):
         return f"Skor Kemiripan: **{persentase}%**\nStatus: {status}\n\n*(Dibandingkan dengan proyek: {detail_lama['nama_proyek']})*"
     except Exception as e:
         return f"Gagal mengecek: {e}"
+def sintesis_pengetahuan_lintas_proyek(semua_riwayat_data):
+    """Menggabungkan semua memori analisis untuk menemukan ide inovatif."""
+    client = dapatkan_client_groq()
+    if not client:
+        return "API Key Groq belum diatur."
+        
+    # Rangkum data dari semua riwayat
+    memori = ""
+    for idx, r in enumerate(semua_riwayat_data):
+        # Ambil 5 konsep teratas dari tiap proyek
+        konsep = ", ".join([k['konsep'] for k in r['konsep_utama'][:5]])
+        memori += f"Proyek {idx+1}: {r['nama_proyek']} | Konsep Utama: {konsep}\n"
+        
+    prompt = f"""Anda adalah seorang Professor dan Visioner Riset. 
+Saya memiliki catatan analisis dari berbagai proyek penelitian di masa lalu (seperti dokumen di bawah). 
+Tugas Anda adalah melakukan SINTESIS LINTAS PROYEK untuk menemukan IDE BARU yang inovatif.
+
+MEMORI DATA PENELITIAN SAYA:
+{memori}
+
+Tugas Anda:
+1. **Analisis Pola**: Apa tema besar yang berulang di semua proyek ini? Apa yang berubah (tren)?
+2. **Identifikasi Celah (Gap)**: Apa topik yang belum pernah digabungkan atau dianalisis?
+3. **3 Ide Penelitian Inovatif**: Buatkan 3 ide penelitian baru yang menggabungkan konsep dari beberapa proyek di atas. Berikan judul dan alasan mengapa ide ini sangat orisinal dan bisa dipublikasikan di jurnal Q1.
+
+Tulis dalam bahasa akademik yang formal."""
+    
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="openai/gpt-oss-120b",
+            temperature=0.7 # Temperatur lebih tinggi untuk kreativitas ide baru
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Gagal melakukan sintesis: {e}"
