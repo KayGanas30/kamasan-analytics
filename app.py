@@ -66,7 +66,7 @@ with st.sidebar:
                     st.write("") 
     
     st.divider()
-    st.caption("Kamasan Analytics v0.6 (AI Powered)")
+    st.caption("Kamasan Analytics v0.7 (AI Powered)")
 
 # === HEADER ===
 col_logo, col_title = st.columns([1, 8])
@@ -108,34 +108,56 @@ if 'view_riwayat' in st.session_state:
             
         narasi = buat_narasi_otomatis(nama_proyek, detail['daftar_file'], detail['konsep_utama'], detail['hasil_pmi'])
         
-        # --- GENERATOR JURNAL ---
+        # --- ACADEMIC CO-PILOT (GENERATOR JURNAL) ---
         st.divider()
-        st.markdown("### 🎓 Generator Artikel Jurnal (Scopus Q1/Q2)")
-        st.write("Gunakan AI untuk merumuskan judul, abstrak, dan rekomendasi reviewer untuk jurnal hukum internasional.")
+        st.markdown("### 🤖 Academic Co-Pilot (Generator Jurnal)")
+        st.write("Ubah hasil analisis ini menjadi draf jurnal siap publikasi (Format IMRaD) yang sesuai dengan target jurnal Anda.")
         
-        if st.button("✨ Buat Draf Jurnal & Reviewer Notes", type="primary"):
-            with st.spinner("Profesor AI sedang menyusun draf jurnal..."):
-                paket_jurnal = generate_jurnal_package(nama_proyek, detail['konsep_utama'], detail['hasil_pmi'])
-                st.session_state['paket_jurnal_ai'] = paket_jurnal
+        api_key_cek = ambil_pengaturan("groq_api_key", "")
+        if not api_key_cek:
+            st.error("⚠️ API Key Groq belum diatur. Silakan atur di sidebar kiri terlebih dahulu.")
+        else:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                target_jurnal = st.text_input("Target Jurnal:", placeholder="misal: Jurnal Hukum Internasional")
+            with col2:
+                bidang_ilmu = st.text_input("Bidang Ilmu:", placeholder="misal: Hukum Tata Negara")
+            with col3:
+                sudut_pandang = st.text_input("Sudut Pandang/Teori:", placeholder="misal: Teori Otonomi Daerah")
                 
-        if 'paket_jurnal_ai' in st.session_state:
-            st.info(st.session_state['paket_jurnal_ai'])
-            
-            word_jurnal = buat_laporan_word_jurnal(
-                nama_proyek, detail['tanggal'], detail['daftar_file'], 
-                detail['konsep_utama'], detail['hasil_pmi'], 
-                st.session_state['paket_jurnal_ai']
-            )
-            st.download_button(
-                label="⬇️ Download Draf Jurnal (Word)",
-                data=word_jurnal,
-                file_name=f"Draf_Jurnal_{nama_file_aman}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                type="primary"
-            )
+            if st.button("✨ Generate Draf Jurnal & Opsi Ide", type="primary"):
+                if not target_jurnal:
+                    st.warning("Harap isi Target Jurnal terlebih dahulu.")
+                else:
+                    with st.spinner("Professor AI sedang menganalisis dan menyusun draf jurnal..."):
+                        paket_jurnal = buat_paket_jurnal_lengkap(
+                            nama_proyek, 
+                            detail['konsep_utama'], 
+                            detail['hasil_pmi'],
+                            target_jurnal,
+                            bidang_ilmu,
+                            sudut_pandang
+                        )
+                        st.session_state['paket_jurnal_ai'] = paket_jurnal
+                        
+            if 'paket_jurnal_ai' in st.session_state and st.session_state['paket_jurnal_ai']:
+                st.markdown(st.session_state['paket_jurnal_ai'])
+                
+                word_jurnal = buat_laporan_word_jurnal(
+                    nama_proyek, detail['tanggal'], detail['daftar_file'], 
+                    detail['konsep_utama'], detail['hasil_pmi'], 
+                    st.session_state['paket_jurnal_ai']
+                )
+                st.download_button(
+                    label="⬇️ Download Draf Jurnal Lengkap (Word)",
+                    data=word_jurnal,
+                    file_name=f"Draf_Jurnal_{nama_file_aman}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    type="primary"
+                )
+        st.divider()
         
         # --- KESIMPULAN & VISUALISASI ---
-        st.divider()
         st.markdown("### 📝 Kesimpulan Eksekutif")
         st.info(narasi)
         
@@ -159,7 +181,7 @@ if 'view_riwayat' in st.session_state:
         df_pmi = pd.DataFrame(detail['hasil_pmi'])
         st.dataframe(df_pmi, use_container_width=True)
         
-        # --- TOMBOL DOWNLOAD ---
+        # --- TOMBOL DOWNLOAD STANDAR ---
         col_dl1, col_dl2, col_dl3 = st.columns(3)
         with col_dl1:
             laporan_md = f"# Laporan: {nama_proyek}\nTanggal: {detail['tanggal']}\n\n"
@@ -170,7 +192,6 @@ if 'view_riwayat' in st.session_state:
             st.download_button("⬇️ Laporan (Markdown)", laporan_md, f"Laporan_{nama_file_aman}.md", "text/markdown")
             
         with col_dl2:
-            # Tombol Word lama kita ganti dengan yang baru (Jurnal)
             word_file = buat_laporan_word_jurnal(
                 nama_proyek, detail['tanggal'], detail['daftar_file'], 
                 detail['konsep_utama'], detail['hasil_pmi'], 
@@ -186,9 +207,9 @@ if 'view_riwayat' in st.session_state:
 
 # === TAB MENU ===
 if is_admin:
-    tab1, tab2, tab3, tab4 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah", "🤖 Tanya AI"])
+    tab1, tab2, tab3 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah"])
 else:
-    tab1, tab2, tab4 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "🤖 Tanya AI"])
+    tab1, tab2 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata"])
     tab3 = None 
 
 with tab1:
@@ -315,63 +336,6 @@ if tab3 is not None:
                 if col_hapus.button("Hapus 🗑️", key=f"del_kamus_{k}"):
                     hapus_kamus_lokal(k)
                     st.rerun()
-
-# === TAB 4: ACADEMIC CO-PILOT ===
-with tab4:
-    st.subheader("🤖 Academic Co-Pilot (Asisten Penulisan Jurnal)")
-    st.write("Ubah hasil survei/dokumen Anda menjadi draf jurnal siap publikasi. AI akan merumuskan ide, novelty, dan draf IMRaD.")
-    
-    if 'view_riwayat' in st.session_state:
-        id_riwayat = st.session_state['view_riwayat']
-        detail = ambil_detail_riwayat(id_riwayat)
-        
-        if detail:
-            st.info(f"Konteks aktif: **{detail['nama_proyek']}**")
-            
-            # Form Input Konteks
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                target_jurnal = st.text_input("Target Jurnal:", placeholder="misal: Jurnal Hukum Internasional")
-            with col2:
-                bidang_ilmu = st.text_input("Bidang Ilmu:", placeholder="misal: Hukum Tata Negara")
-            with col3:
-                sudut_pandang = st.text_input("Sudut Pandang/Teori:", placeholder="misal: Teori Otonomi Daerah")
-                
-            if st.button("✨ Generate Draf Jurnal & Opsi Ide", type="primary"):
-                if not target_jurnal:
-                    st.warning("Harap isi Target Jurnal terlebih dahulu.")
-                else:
-                    with st.spinner("Professor AI sedang menganalisis dan menyusun draf jurnal..."):
-                        paket_jurnal = buat_paket_jurnal_lengkap(
-                            detail['nama_proyek'], 
-                            detail['konsep_utama'], 
-                            detail['hasil_pmi'],
-                            target_jurnal,
-                            bidang_ilmu,
-                            sudut_pandang
-                        )
-                        st.session_state['paket_jurnal_ai'] = paket_jurnal
-                        
-            if 'paket_jurnal_ai' in st.session_state:
-                st.markdown(st.session_state['paket_jurnal_ai'])
-                
-                # Tombol Download Word
-                word_jurnal = buat_laporan_word_jurnal(
-                    detail['nama_proyek'], detail['tanggal'], detail['daftar_file'], 
-                    detail['konsep_utama'], detail['hasil_pmi'], 
-                    st.session_state['paket_jurnal_ai']
-                )
-                st.download_button(
-                    label="⬇️ Download Draf Jurnal Lengkap (Word)",
-                    data=word_jurnal,
-                    file_name=f"Draf_Jurnal_{detail['nama_proyek'].replace(' ', '_')}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    type="primary"
-                )
-        else:
-            st.warning("Data riwayat tidak ditemukan.")
-    else:
-        st.info("💡 Silakan buka salah satu **Riwayat Tempaan** di sidebar terlebih dahulu, lalu kembali ke tab ini untuk membuat draf jurnal.")
 
 st.divider()
 st.caption("Kamasan Analytics · Offline-first · Data tetap di perangkat Anda")
