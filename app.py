@@ -19,11 +19,12 @@ from src.ai_helper import (tanya_ai_analisis, dapatkan_client_groq,
                            buat_ringkasan_ai, kategorisasi_konsep_ai, 
                            generate_jurnal_package, buat_paket_jurnal_lengkap,
                            pilih_opsi_dan_buat_draf, cari_referensi_riil, 
-                           review_jurnal_otomatis, cek_plagiarisme_dasar)
+                           review_jurnal_otomatis, cek_plagiarisme_dasar,
+                           sintesis_pengetahuan_lintas_proyek)
 
 st.set_page_config(page_title="Kamasan Analytics", page_icon="🔨", layout="wide")
 
-# --- TAMBAHAN BARU: PENAMPIL HASIL SEMENTARA ---
+# --- PENAMPIL HASIL SEMENTARA ---
 if 'hasil_baru' in st.session_state:
     hasil = st.session_state['hasil_baru']
     st.success("✅ Analisis berhasil disimpan ke Riwayat!")
@@ -45,7 +46,6 @@ if 'hasil_baru' in st.session_state:
         st.rerun()
         
     st.divider()
-# -----------------------------------------------
 
 init_db()
 
@@ -104,7 +104,7 @@ with st.sidebar:
                     st.write("") 
     
     st.divider()
-    st.caption("Kamasan Analytics v0.8 (AI Powered)")
+    st.caption("Kamasan Analytics v0.9 (AI Powered)")
 
 # === HEADER ===
 col_logo, col_title = st.columns([1, 8])
@@ -335,9 +335,9 @@ if 'view_riwayat' in st.session_state:
 
 # === TAB MENU ===
 if is_admin:
-    tab1, tab2, tab3 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah", "🧠 Sintesis Pengetahuan"])
 else:
-    tab1, tab2 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata"])
+    tab1, tab2, tab4 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "🧠 Sintesis Pengetahuan"])
     tab3 = None 
 
 with tab1:
@@ -449,6 +449,44 @@ if tab3 is not None:
                 if col_hapus.button("Hapus 🗑️", key=f"del_kamus_{k}"):
                     hapus_kamus_lokal(k)
                     st.rerun()
+
+# === TAB 4: KNOWLEDGE SYNTHESIS ===
+with tab4:
+    st.subheader("🧠 Knowledge Synthesis (AI Cross-Project)")
+    st.write("AI akan membaca semua riwayat penelitian Anda dan menggabungkannya untuk menemukan ide-ide baru yang inovatif.")
+    
+    riwayat_semua = ambil_semua_riwayat()
+    if len(riwayat_semua) < 2:
+        st.info("💡 Anda memerlukan minimal 2 riwayat analisis untuk melakukan sintesis lintas proyek.")
+    else:
+        st.success(f"Ditemukan {len(riwayat_semua)} riwayat di database Anda.")
+        
+        if st.button("✨ Temukan Ide Baru dari Seluruh Data", type="primary"):
+            with st.spinner("Professor AI sedang membaca semua memori penelitian Anda..."):
+                data_lengkap = []
+                for r in riwayat_semua:
+                    detail_r = ambil_detail_riwayat(r[0])
+                    if detail_r:
+                        data_lengkap.append(detail_r)
+                
+                hasil_sintesis = sintesis_pengetahuan_lintas_proyek(data_lengkap)
+                st.session_state['hasil_sintesis'] = hasil_sintesis
+                
+        if 'hasil_sintesis' in st.session_state:
+            st.markdown("### 💡 Ide Penelitian Inovatif (Hasil Sintesis AI)")
+            st.info(st.session_state['hasil_sintesis'])
+            
+            word_sintesis = buat_laporan_word_jurnal(
+                "Sintesis_Lintas_Proyek", "Hari ini", ["Semua Riwayat Database"], 
+                [], [], st.session_state['hasil_sintesis']
+            )
+            st.download_button(
+                label="⬇️ Download Hasil Sintesis (Word)",
+                data=word_sintesis,
+                file_name="Ide_Penelitian_Inovatif.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                type="primary"
+            )
 
 st.divider()
 st.caption("Kamasan Analytics · Offline-first · Data tetap di perangkat Anda")
