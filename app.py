@@ -17,7 +17,7 @@ from src.database import (init_db, simpan_analisis, ambil_semua_riwayat,
 from src.reporting import buat_laporan_word_jurnal, buat_narasi_otomatis
 from src.ai_helper import (tanya_ai_analisis, dapatkan_client_groq, 
                            buat_ringkasan_ai, kategorisasi_konsep_ai, 
-                           generate_jurnal_package)
+                           generate_jurnal_package, buat_paket_jurnal_lengkap)
 
 st.set_page_config(page_title="Kamasan Analytics", page_icon="🔨", layout="wide")
 
@@ -316,37 +316,62 @@ if tab3 is not None:
                     hapus_kamus_lokal(k)
                     st.rerun()
 
-# === TAB 4: TANYA AI ===
+# === TAB 4: ACADEMIC CO-PILOT ===
 with tab4:
-    st.subheader("🤖 Tanya Jawab Dokumen dengan AI")
-    st.write("Ajukan pertanyaan tentang hasil analisis dokumen yang sedang dibuka, atau unggah dokumen baru.")
+    st.subheader("🤖 Academic Co-Pilot (Asisten Penulisan Jurnal)")
+    st.write("Ubah hasil survei/dokumen Anda menjadi draf jurnal siap publikasi. AI akan merumuskan ide, novelty, dan draf IMRaD.")
     
-    # Cek apakah ada riwayat yang sedang dibuka
     if 'view_riwayat' in st.session_state:
         id_riwayat = st.session_state['view_riwayat']
         detail = ambil_detail_riwayat(id_riwayat)
         
         if detail:
             st.info(f"Konteks aktif: **{detail['nama_proyek']}**")
-            pertanyaan = st.text_area("Pertanyaan Anda:", placeholder="Contoh: Mengapa konsep 'adat' sangat penting dalam dokumen ini?")
             
-            if st.button("Kirim ke AI", type="primary"):
-                if pertanyaan:
-                    with st.spinner("Kamasan AI sedang berpikir..."):
-                        jawaban = tanya_ai_analisis(
-                            pertanyaan, 
+            # Form Input Konteks
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                target_jurnal = st.text_input("Target Jurnal:", placeholder="misal: Jurnal Hukum Internasional")
+            with col2:
+                bidang_ilmu = st.text_input("Bidang Ilmu:", placeholder="misal: Hukum Tata Negara")
+            with col3:
+                sudut_pandang = st.text_input("Sudut Pandang/Teori:", placeholder="misal: Teori Otonomi Daerah")
+                
+            if st.button("✨ Generate Draf Jurnal & Opsi Ide", type="primary"):
+                if not target_jurnal:
+                    st.warning("Harap isi Target Jurnal terlebih dahulu.")
+                else:
+                    with st.spinner("Professor AI sedang menganalisis dan menyusun draf jurnal..."):
+                        paket_jurnal = buat_paket_jurnal_lengkap(
                             detail['nama_proyek'], 
                             detail['konsep_utama'], 
-                            detail['hasil_pmi']
+                            detail['hasil_pmi'],
+                            target_jurnal,
+                            bidang_ilmu,
+                            sudut_pandang
                         )
-                        st.markdown("### Jawaban AI:")
-                        st.success(jawaban)
-                else:
-                    st.warning("Silakan ketik pertanyaan terlebih dahulu.")
+                        st.session_state['paket_jurnal_ai'] = paket_jurnal
+                        
+            if 'paket_jurnal_ai' in st.session_state:
+                st.markdown(st.session_state['paket_jurnal_ai'])
+                
+                # Tombol Download Word
+                word_jurnal = buat_laporan_word_jurnal(
+                    detail['nama_proyek'], detail['tanggal'], detail['daftar_file'], 
+                    detail['konsep_utama'], detail['hasil_pmi'], 
+                    st.session_state['paket_jurnal_ai']
+                )
+                st.download_button(
+                    label="⬇️ Download Draf Jurnal Lengkap (Word)",
+                    data=word_jurnal,
+                    file_name=f"Draf_Jurnal_{detail['nama_proyek'].replace(' ', '_')}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    type="primary"
+                )
         else:
             st.warning("Data riwayat tidak ditemukan.")
     else:
-        st.info("💡 Silakan buka salah satu **Riwayat Tempaan** di sidebar terlebih dahulu, lalu kembali ke tab ini untuk bertanya.")
+        st.info("💡 Silakan buka salah satu **Riwayat Tempaan** di sidebar terlebih dahulu, lalu kembali ke tab ini untuk membuat draf jurnal.")
 
 st.divider()
 st.caption("Kamasan Analytics · Offline-first · Data tetap di perangkat Anda")
