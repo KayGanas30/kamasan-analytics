@@ -21,48 +21,21 @@ def buat_narasi_otomatis(nama_proyek, daftar_file, konsep_utama, hasil_pmi):
 
 def buat_laporan_word_jurnal(nama_proyek, tanggal, daftar_file, konsep_utama, hasil_pmi, paket_jurnal_ai):
     doc = docx.Document()
-    
-    # Set Font Default (Times New Roman 12)
     style = doc.styles['Normal']
     font = style.font
     font.name = 'Times New Roman'
     font.size = Pt(12)
 
-    # 1. Judul & Metadata (Placeholder)
-    doc.add_heading('Draf Artikel Jurnal Internasional (Scopus Q1/Q2)', 0)
-    doc.add_paragraph(f"Proyek Analisis: {nama_proyek}")
-    doc.add_paragraph(f"Tanggal Generate: {tanggal}")
-    doc.add_paragraph(f"Sumber Dokumen: {', '.join(daftar_file)}")
+    # Hapus metadata internal, langsung ke konten
+    # doc.add_heading('Draf Artikel Jurnal Internasional', 0) # Boleh ada atau tidak
     
-    doc.add_heading('1. Rekomendasi Judul & Abstrak (AI Generated)', level=1)
-    doc.add_paragraph(paket_jurnal_ai)
+    # Bersihkan Markdown dari AI
+    teks_bersih = paket_jurnal_ai.replace("**", "").replace("# ", "").replace("## ", "")
     
-    doc.add_heading('2. Hasil Analisis Kuantitatif Teks (Kamasan Engine)', level=1)
-    
-    # Narasi Otomatis
-    narasi = buat_narasi_otomatis(nama_proyek, daftar_file, konsep_utama, hasil_pmi)
-    doc.add_paragraph(narasi)
-    
-    # Konsep Utama
-    doc.add_heading('Konsep Utama Terdeteksi', level=2)
-    for k in konsep_utama:
-        doc.add_paragraph(f"{k['konsep']} (Skor: {k['skor']:.2f})", style='List Bullet')
-        
-    # Tabel PMI
-    doc.add_heading('Matriks Hubungan Konsep (PMI)', level=2)
-    if hasil_pmi:
-        df = pd.DataFrame(hasil_pmi)
-        table = doc.add_table(rows=1, cols=len(df.columns))
-        table.style = 'Table Grid'
-        
-        hdr_cells = table.rows[0].cells
-        for i, col in enumerate(df.columns):
-            hdr_cells[i].text = col.capitalize()
-            
-        for _, row in df.iterrows():
-            row_cells = table.add_row().cells
-            for i, val in enumerate(row):
-                row_cells[i].text = str(val)
+    # Pisahkan per baris dan masukkan ke Word
+    for baris in teks_bersih.split('\n'):
+        if baris.strip():
+            doc.add_paragraph(baris.strip())
     
     file_stream = io.BytesIO()
     doc.save(file_stream)
