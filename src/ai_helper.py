@@ -1,19 +1,34 @@
 import streamlit as st
 from groq import Groq
 from src.database import ambil_pengaturan, simpan_pengaturan
+import os
+import PyPDF2
 
 def dapatkan_client_groq():
-    """Mengambil client Groq dari API key yang tersimpan."""
     api_key = ambil_pengaturan("groq_api_key")
     if not api_key:
         return None
     return Groq(api_key=api_key)
 
+def baca_template_jurnal(file_path="assets/template_jurnal.pdf"):
+    """Membaca teks dari file template jurnal (jika ada)."""
+    if not os.path.exists(file_path):
+        return ""
+    try:
+        with open(file_path, 'rb') as f:
+            reader = PyPDF2.PdfReader(f)
+            teks = ""
+            for page in reader.pages:
+                if page.extract_text():
+                    teks += page.extract_text() + "\n"
+            return teks[:2000] 
+    except Exception:
+        return ""
+
 def tanya_ai_analisis(pertanyaan, nama_proyek, konsep_utama, hasil_pmi):
-    """Mengirim pertanyaan ke AI beserta konteks hasil analisis."""
     client = dapatkan_client_groq()
     if not client:
-        return "⚠️ API Key Groq belum diatur. Silakan atur di menu Pengaturan AI."
+        return "⚠️ API Key Groq belum diatur."
     
     konteks_konsep = ", ".join([f"{k['konsep']} (skor {k['skor']:.2f})" for k in konsep_utama[:10]])
     konteks_pmi = "\n".join([f"- {p['kata_a']} berhubungan dengan {p['kata_b']} (muncul {p['frekuensi']}x)" for p in hasil_pmi[:10]])
@@ -42,10 +57,9 @@ Jawab dengan bahasa Indonesia yang akademis, jelas, dan ringkas."""
         return f"⚠️ Terjadi kesalahan saat menghubungi AI: {e}"
 
 def buat_ringkasan_ai(nama_proyek, konsep_utama, hasil_pmi):
-    """Meminta AI membuat paragraf kesimpulan yang natural."""
     client = dapatkan_client_groq()
     if not client:
-        return "API Key belum diatur, tidak bisa membuat ringkasan AI."
+        return "API Key belum diatur."
         
     konteks = f"Proyek: {nama_proyek}\nKonsep Utama: {', '.join([k['konsep'] for k in konsep_utama[:10]])}\n"
     if hasil_pmi:
@@ -66,7 +80,6 @@ Jelaskan apa maksud dan tujuan utama dari dokumen yang dianalisis ini. Jangan gu
         return f"Gagal membuat ringkasan AI: {e}"
 
 def kategorisasi_konsep_ai(konsep_utama):
-    """Meminta AI mengelompokkan konsep ke dalam kategori."""
     client = dapatkan_client_groq()
     if not client:
         return "API Key belum diatur."
@@ -89,7 +102,6 @@ Kategori 2: konsep_c, konsep_d"""
         return f"Gagal: {e}"
 
 def generate_jurnal_package(nama_proyek, konsep_utama, hasil_pmi):
-    """Menghasilkan Judul, Abstrak, dan Rekomendasi Reviewer untuk Jurnal Hukum."""
     client = dapatkan_client_groq()
     if not client:
         return None
@@ -120,13 +132,14 @@ Tolong buatkan paket publikasi dalam format berikut (JANGAN gunakan bullet point
         return f"Gagal membuat paket jurnal: {e}"
 
 def buat_paket_jurnal_lengkap(nama_proyek, konsep_utama, hasil_pmi, target_jurnal, bidang_ilmu, sudut_pandang):
-    """Menghasilkan opsi ide, temuan, dan draf IMRaD (Co-Pilot)."""
     client = dapatkan_client_groq()
     if not client:
         return "API Key Groq belum diatur."
         
     konteks_konsep = ", ".join([k['konsep'] for k in konsep_utama[:15]])
     konteks_pmi = "\n".join([f"- {p['kata_a']} berhubungan dengan {p['kata_b']} (Frek: {p['frekuensi']})" for p in hasil_pmi[:10]])
+    
+    template_teks = baca_template_jurnal()
 
     prompt = f"""Anda adalah seorang Professor dan Editor Jurnal Internasional Bereputasi (Scopus Q1/Q2).
 Saya memiliki hasil analisis teks dari data survei/penelitian berjudul '{nama_proyek}'.
@@ -139,14 +152,17 @@ Target Jurnal: {target_jurnal}
 Bidang Ilmu: {bidang_ilmu}
 Sudut Pandang Teori: {sudut_pandang}
 
+CONTOH GAYA PENULISAN JURNAL TARGET (ikuti gaya ini):
+{template_teks if template_teks else "Gunakan gaya akademik standar IMRaD."}
+
 Tugas Anda:
-1. **OPSI IDE & NOVELTY**: Berikan 3 Opsi Ide Penelitian/Judul Artikel beserta penjelasan singkat "Apa Kebaruan (Novelty)-nya?" untuk masing-masing opsi.
+1. **OPSI IDE & NOVELTY**: Berikan 3 Opsi Ide Penelitian/Judul Artikel beserta penjelasan singkat "Apa Kebaruan (Novelty)-nya?".
 2. **STRUKTUR DRAF JURNAL STANDAR (IMRaD)**: Berdasarkan Opsi Ide Terbaik (beri label "REKOMENDASI UTAMA"), buatkan draf jurnal dengan struktur:
    - **Title**: Judul bahasa Inggris yang *publishable*.
    - **Abstract**: 1 paragraf (150-200 kata).
    - **Introduction**: Latar belakang, masalah, dan tujuan.
    - **Methodology**: Jelaskan bahwa analisis menggunakan pendekatan kuantitatif-kualitatif (sebutkan *Text Mining/PMI* sebagai metode bantuan).
-   - **Results & Discussion**: Narasikan temuan dari tabel PMI dan Konsep Utama ke dalam bahasa akademik. Hubungkan dengan teori.
+   - **Results & Discussion**: Narasikan temuan dari tabel PMI dan Konsep Utama ke dalam bahasa akademik.
    - **Conclusion**: Kesimpulan dan saran.
 3. **CHECKLIST REVIEWER**: Berikan 3 catatan (Reviewer Notes) apa saja yang harus diperbaiki dosen agar sesuai dengan kriteria `{target_jurnal}`.
 
@@ -163,7 +179,6 @@ Tulis dalam bahasa Indonesia yang sangat formal, akademis, dan siap dipublikasik
         return f"Gagal membuat paket jurnal: {e}"
 
 def pilih_opsi_dan_buat_draf(nama_proyek, konsep_utama, hasil_pmi, target_jurnal, bidang_ilmu, sudut_pandang, opsi_terpilih):
-    """Membuat draf IMRaD berdasarkan opsi ide yang dipilih pengguna."""
     client = dapatkan_client_groq()
     if not client:
         return "API Key Groq belum diatur."
@@ -197,7 +212,6 @@ Tugas: Tulis draf artikel jurnal lengkap menggunakan format IMRaD standar (Title
         return f"Gagal membuat draf: {e}"
 
 def cari_referensi_riil(konsep_utama):
-    """Mencari referensi riil menggunakan Semantic Scholar API."""
     import requests
     query = " ".join([k['konsep'] for k in konsep_utama[:3]])
     url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit=5&fields=title,authors,year,url"
@@ -217,7 +231,6 @@ def cari_referensi_riil(konsep_utama):
         return f"Gagal mencari referensi: {e}"
 
 def review_jurnal_otomatis(teks_draf, target_jurnal):
-    """Bertindak sebagai Reviewer Jurnal dan memberikan catatan revisi."""
     client = dapatkan_client_groq()
     if not client:
         return "API Key belum diatur."
@@ -231,7 +244,7 @@ DRAF ARTIKEL:
 Berikan review dalam format:
 1. **Ringkasan Penilaian**: Apakah artikel ini layak dilanjutkan? (1 paragraf)
 2. **Kekuatan Utama**: 2-3 poin kekuatan artikel.
-3. **Kelemahan & Saran Revisi**: 3-4 poin kritis yang harus diperbaiki (metodologi, teori, data, dll).
+3. **Kelemahan & Saran Revisi**: 3-4 poin kritis yang harus diperbaiki.
 4. **Rekomendasi Akhir**: (Accept / Minor Revision / Major Revision / Reject).
 """
     try:
@@ -245,7 +258,6 @@ Berikan review dalam format:
         return f"Gagal melakukan review: {e}"
 
 def cek_plagiarisme_dasar(teks_baru, id_riwayat_lama):
-    """Membandingkan draf baru dengan draf lama menggunakan Cosine Similarity."""
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
     from src.database import ambil_detail_riwayat
@@ -279,7 +291,6 @@ def cek_plagiarisme_dasar(teks_baru, id_riwayat_lama):
         return f"Gagal mengecek: {e}"
 
 def sintesis_pengetahuan_lintas_proyek(semua_riwayat_data):
-    """Menggabungkan semua memori analisis untuk menemukan ide inovatif."""
     client = dapatkan_client_groq()
     if not client:
         return "API Key Groq belum diatur."
