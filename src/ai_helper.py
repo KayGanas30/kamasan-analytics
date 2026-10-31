@@ -118,7 +118,9 @@ Tolong buatkan paket publikasi dalam format berikut (JANGAN gunakan bullet point
         return response.choices[0].message.content
     except Exception as e:
         return f"Gagal membuat paket jurnal: {e}"
+
 def buat_paket_jurnal_lengkap(nama_proyek, konsep_utama, hasil_pmi, target_jurnal, bidang_ilmu, sudut_pandang):
+    """Menghasilkan opsi ide, temuan, dan draf IMRaD (Co-Pilot)."""
     client = dapatkan_client_groq()
     if not client:
         return "API Key Groq belum diatur."
@@ -126,58 +128,40 @@ def buat_paket_jurnal_lengkap(nama_proyek, konsep_utama, hasil_pmi, target_jurna
     konteks_konsep = ", ".join([k['konsep'] for k in konsep_utama[:15]])
     konteks_pmi = "\n".join([f"- {p['kata_a']} berhubungan dengan {p['kata_b']} (Frek: {p['frekuensi']})" for p in hasil_pmi[:10]])
 
-    prompt = f"""Anda adalah Editor Jurnal Internasional Scopus Q1/Q2. Tugas Anda adalah membantu dosen mengubah data mentah menjadi artikel ilmiah standar IMRaD.
-
-DATA MENTAH:
-Nama Proyek: {nama_proyek}
-Konsep Kunci: {konteks_konsep}
+    prompt = f"""Anda adalah seorang Professor dan Editor Jurnal Internasional Bereputasi (Scopus Q1/Q2).
+Saya memiliki hasil analisis teks dari data survei/penelitian berjudul '{nama_proyek}'.
+Data yang ditemukan:
+Konsep Utama: {konteks_konsep}
 Hubungan Konsep (PMI): 
 {konteks_pmi}
 
-KONTEKS TARGET:
-Jurnal Tujuan: {target_jurnal}
-Bidang: {bidang_ilmu}
-Sudut Pandang: {sudut_pandang}
+Target Jurnal: {target_jurnal}
+Bidang Ilmu: {bidang_ilmu}
+Sudut Pandang Teori: {sudut_pandang}
 
-INSTRUKSI OUTPUT (Gunakan format Markdown yang bersih, TANPA penomoran angka di heading):
+Tugas Anda:
+1. **OPSI IDE & NOVELTY**: Berikan 3 Opsi Ide Penelitian/Judul Artikel beserta penjelasan singkat "Apa Kebaruan (Novelty)-nya?" untuk masing-masing opsi.
+2. **STRUKTUR DRAF JURNAL STANDAR (IMRaD)**: Berdasarkan Opsi Ide Terbaik (beri label "REKOMENDASI UTAMA"), buatkan draf jurnal dengan struktur:
+   - **Title**: Judul bahasa Inggris yang *publishable*.
+   - **Abstract**: 1 paragraf (150-200 kata).
+   - **Introduction**: Latar belakang, masalah, dan tujuan.
+   - **Methodology**: Jelaskan bahwa analisis menggunakan pendekatan kuantitatif-kualitatif (sebutkan *Text Mining/PMI* sebagai metode bantuan).
+   - **Results & Discussion**: Narasikan temuan dari tabel PMI dan Konsep Utama ke dalam bahasa akademik. Hubungkan dengan teori.
+   - **Conclusion**: Kesimpulan dan saran.
+3. **CHECKLIST REVIEWER**: Berikan 3 catatan (Reviewer Notes) apa saja yang harus diperbaiki dosen agar sesuai dengan kriteria `{target_jurnal}`.
 
-# BAGIAN 1: OPSI IDE & NOVELTY (Pilih Salah Satu)
-Berikan 2 opsi ide penelitian. Untuk masing-masing, jelaskan "Apa kebaruan (novelty)-nya?" dalam 1-2 kalimat.
-
-# BAGIAN 2: DRAF ARTIKEL ILMIAH (Format IMRaD)
-Tulis draf lengkap berdasarkan Opsi Ide Terbaik. Gunakan heading berikut (tanpa angka):
-
-## Title
-(Tulis judul bahasa Inggris yang akademis dan spesifik)
-
-## Abstract
-(Tulis 1 paragraf padat 150-200 kata. Harus memuat: Latar Belakang, Tujuan, Metode (sebutkan Text Mining/PMI), Temuan Utama, dan Implikasi.)
-
-## Introduction
-(Paragraf 1: Latar belakang masalah spesifik. Paragraf 2: Celah pengetahuan/Research Gap. Paragraf 3: Tujuan penelitian dan kontribusi.)
-
-## Methods
-(Jelaskan secara metodologis: Pengumpulan data dokumen, proses preprocessing teks, ekstraksi konsep menggunakan TF-IDF, dan analisis hubungan menggunakan PMI. Sebutkan bahwa ini adalah pendekatan analisis teks kuantitatif-kualitatif.)
-
-## Results and Discussion
-(Sajikan temuan berdasarkan Konsep Kunci dan PMI. Diskusikan mengapa hubungan antar kata tersebut penting secara akademis. Hubungkan dengan teori {sudut_pandang}. Jangan hanya menyebutkan angka, tapi interpretasikan maknanya.)
-
-## Conclusion
-(Ringkas temuan utama dalam 1 paragraf. Jelaskan implikasi praktis untuk {bidang_ilmu}. Berikan saran untuk penelitian selanjutnya.)
-
-## References
-(Buat 3-5 contoh referensi fiktif/umum yang relevan dengan topik ini dalam format APA Style untuk memberikan gambaran.)
-"""
+Tulis dalam bahasa Indonesia yang sangat formal, akademis, dan siap dipublikasikan. Gunakan format Heading untuk setiap bagian."""
     
     try:
         response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model="openai/gpt-oss-120b",
-            temperature=0.4
+            temperature=0.5
         )
         return response.choices[0].message.content
     except Exception as e:
         return f"Gagal membuat paket jurnal: {e}"
+
 def pilih_opsi_dan_buat_draf(nama_proyek, konsep_utama, hasil_pmi, target_jurnal, bidang_ilmu, sudut_pandang, opsi_terpilih):
     """Membuat draf IMRaD berdasarkan opsi ide yang dipilih pengguna."""
     client = dapatkan_client_groq()
@@ -242,7 +226,7 @@ def review_jurnal_otomatis(teks_draf, target_jurnal):
 Tugas Anda adalah mereview draf artikel berikut dan memberikan catatan kritis agar bisa lolos publikasi.
 
 DRAF ARTIKEL:
-{teks_draf[:3000]} # Dibatasi 3000 karakter pertama untuk menghemat token
+{teks_draf[:3000]} 
 
 Berikan review dalam format:
 1. **Ringkasan Penilaian**: Apakah artikel ini layak dilanjutkan? (1 paragraf)
@@ -271,7 +255,6 @@ def cek_plagiarisme_dasar(teks_baru, id_riwayat_lama):
     if not detail_lama:
         return "Data lama tidak ditemukan."
         
-    # Ambil teks dari riwayat lama (menggunakan narasi otomatis sebagai proxy)
     from src.reporting import buat_narasi_otomatis
     teks_lama = buat_narasi_otomatis(
         detail_lama['nama_proyek'], detail_lama['daftar_file'], 
@@ -294,21 +277,20 @@ def cek_plagiarisme_dasar(teks_baru, id_riwayat_lama):
         return f"Skor Kemiripan: **{persentase}%**\nStatus: {status}\n\n*(Dibandingkan dengan proyek: {detail_lama['nama_proyek']})*"
     except Exception as e:
         return f"Gagal mengecek: {e}"
+
 def sintesis_pengetahuan_lintas_proyek(semua_riwayat_data):
     """Menggabungkan semua memori analisis untuk menemukan ide inovatif."""
     client = dapatkan_client_groq()
     if not client:
         return "API Key Groq belum diatur."
         
-    # Rangkum data dari semua riwayat
     memori = ""
     for idx, r in enumerate(semua_riwayat_data):
-        # Ambil 5 konsep teratas dari tiap proyek
         konsep = ", ".join([k['konsep'] for k in r['konsep_utama'][:5]])
         memori += f"Proyek {idx+1}: {r['nama_proyek']} | Konsep Utama: {konsep}\n"
         
     prompt = f"""Anda adalah seorang Professor dan Visioner Riset. 
-Saya memiliki catatan analisis dari berbagai proyek penelitian di masa lalu (seperti dokumen di bawah). 
+Saya memiliki catatan analisis dari berbagai proyek penelitian di masa lalu. 
 Tugas Anda adalah melakukan SINTESIS LINTAS PROYEK untuk menemukan IDE BARU yang inovatif.
 
 MEMORI DATA PENELITIAN SAYA:
@@ -325,7 +307,7 @@ Tulis dalam bahasa akademik yang formal."""
         response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model="openai/gpt-oss-120b",
-            temperature=0.7 # Temperatur lebih tinggi untuk kreativitas ide baru
+            temperature=0.7
         )
         return response.choices[0].message.content
     except Exception as e:
