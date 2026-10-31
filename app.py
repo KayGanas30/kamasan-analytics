@@ -21,8 +21,7 @@ from src.ai_helper import (tanya_ai_analisis, dapatkan_client_groq,
 
 st.set_page_config(page_title="Kamasan Analytics", page_icon="🔨", layout="wide")
 
-# --- TAMBAHKAN KODE INI ---
-# Cek jika ada hasil analisis baru di memori, tampilkan
+# --- TAMBAHAN BARU: PENAMPIL HASIL SEMENTARA ---
 if 'hasil_baru' in st.session_state:
     hasil = st.session_state['hasil_baru']
     st.success("✅ Analisis berhasil disimpan ke Riwayat!")
@@ -44,7 +43,8 @@ if 'hasil_baru' in st.session_state:
         st.rerun()
         
     st.divider()
-# ---------------------------
+# -----------------------------------------------
+
 init_db()
 
 # === SIDEBAR ===
@@ -246,7 +246,8 @@ with tab1:
             st.warning("⚠️ Harap isi 'Nama Proyek / Data' di atas.")
         else:
             st.success(f"{len(uploaded_files)} file siap ditempa.")
-                        if st.button("🚀 Mulai Tempa Analisis", type="primary"):
+            
+            if st.button("🚀 Mulai Tempa Analisis", type="primary"):
                 with st.spinner("Menempa data..."):
                     semua_kata, daftar_kata_per_dokumen, nama_file = [], [], []
                     kamus_terbaru = ambil_kamus_lokal()
@@ -264,18 +265,16 @@ with tab1:
                         konsep_utama = ekstrak_konsep_utama(daftar_kata_per_dokumen, top_n=15)
                         hasil_pmi = hitung_pmi(semua_kata, min_cooccurrence=5)
                         
-                        # Simpan ke Database
                         simpan_analisis(nama_proyek_input, nama_file, konsep_utama, hasil_pmi)
                         
-                        # Simpan ke Session State agar bisa ditampilkan setelah rerun
                         st.session_state['hasil_baru'] = {
                             "nama": nama_proyek_input,
                             "konsep": konsep_utama,
                             "pmi": hasil_pmi
                         }
-                        
-                        # Paksa Streamlit untuk refresh halaman!
                         st.rerun()
+    else:
+        st.info("Belum ada file.")
 
 with tab2:
     st.subheader("🔍 Pencarian Konteks Kata")
@@ -300,10 +299,7 @@ if tab3 is not None:
         st.subheader("📖 Kamus Istilah Lokal")
         st.write("Tambahkan istilah khusus agar sistem tidak membuangnya saat analisis.")
         
-        # --- FITUR IMPOR MASSAL ---
         st.markdown("### 📥 Impor Massal (Copy-Paste)")
-        st.write("Pisahkan setiap kata dengan koma, spasi, atau enter.")
-        
         teks_massal = st.text_area("Tempel daftar kata di sini:", height=150)
         
         if st.button("🚀 Impor Semua ke Kamus", type="primary"):
@@ -311,38 +307,33 @@ if tab3 is not None:
                 daftar_kata = re.split(r'[,\n\s]+', teks_massal)
                 daftar_kata = [k.strip().lower() for k in daftar_kata if k.strip()]
                 
-                berhasil = 0
-                gagal = 0
+                berhasil, gagal = 0, 0
                 for k in daftar_kata:
-                    if tambah_kamus_lokal(k):
-                        berhasil += 1
-                    else:
-                        gagal += 1
+                    if tambah_kamus_lokal(k): berhasil += 1
+                    else: gagal += 1
                 
                 st.success(f"Selesai! {berhasil} istilah baru ditambahkan. ({gagal} istilah sudah ada).")
                 st.rerun()
                 
         st.divider()
         
-        # --- TAMBAH SATU PER SATU ---
         st.markdown("### ➕ Tambah Satu Istilah")
         col_input, col_btn = st.columns([3, 1])
         with col_input:
-            kata_baru = st.text_input("Istilah baru:", placeholder="Contoh: wamena, Dani, noken")
+            kata_baru = st.text_input("Istilah baru:", placeholder="Contoh: wamena")
         with col_btn:
             st.write("") 
             st.write("")
             if st.button("Tambah", use_container_width=True):
                 if kata_baru:
                     if tambah_kamus_lokal(kata_baru):
-                        st.success(f"Istilah '{kata_baru}' berhasil ditambahkan!")
+                        st.success(f"Istilah '{kata_baru}' ditambahkan!")
                         st.rerun()
                     else:
-                        st.warning(f"Istilah '{kata_baru}' sudah ada.")
+                        st.warning(f"Istilah sudah ada.")
                         
         st.divider()
         
-        # --- DAFTAR ISTILAH ---
         st.markdown("### Daftar Istilah Saat Ini")
         kamus_sekarang = ambil_kamus_lokal()
         if not kamus_sekarang:
