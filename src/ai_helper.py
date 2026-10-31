@@ -32,3 +32,34 @@ def tanya_ai(konteks_dokumen, pertanyaan_user, api_key):
         
     except Exception as e:
         return f"Terjadi kesalahan pada AI: {str(e)}"
+
+def generate_jurnal_package(nama_proyek, konsep_utama, hasil_pmi):
+    """Menghasilkan Judul, Abstrak, dan Rekomendasi Reviewer untuk Jurnal Hukum."""
+    client = dapatkan_client_groq()
+    if not client:
+        return None
+        
+    konteks_konsep = ", ".join([k['konsep'] for k in konsep_utama[:10]])
+    konteks_pmi = ", ".join([f"{p['kata_a']}-{p['kata_b']}" for p in hasil_pmi[:5]])
+
+    prompt = f"""Anda adalah seorang Professor of Law dan Editor-in-Chief jurnal Scopus Q1.
+Berdasarkan hasil analisis teks berikut:
+Proyek: {nama_proyek}
+Konsep Kunci: {konteks_konsep}
+Hubungan Kuat: {konteks_pmi}
+
+Tolong buatkan paket publikasi dalam format berikut (JANGAN gunakan bullet points, gunakan penomoran/heading):
+1. **3 JUDUL ARTIKEL (Gaya Hukum Internasional, beri penekanan pada novelty/ kebaruan)**: Buat judul bahasa Inggris yang akademis dan tidak plagiat.
+2. **EXECUTIVE SUMMARY (ABSTRACT)**: 1 paragraf padat (150-200 kata) berisi latar belakang, tujuan, metode analisis teks, dan temuan utama.
+3. **REKOMENDASI JURNAL (Q1/Q2)**: Sebutkan 3 jurnal hukum internasional yang cocok untuk topik ini beserta alasan singkatnya.
+4. **CATATAN REVIEWER (Reviewer's Critique)**: Berikan 3 kritik pedas namun membangun (seolah-olah Anda mereview paper ini) agar temuan ini bisa lolos Q1/Q2.
+"""
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="openai/gpt-oss-120b",
+            temperature=0.6
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Gagal membuat paket jurnal: {e}"

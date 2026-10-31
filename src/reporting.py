@@ -1,58 +1,56 @@
 import docx
+from docx.shared import Pt, Inches
 import io
 import pandas as pd
 
 def buat_narasi_otomatis(nama_proyek, daftar_file, konsep_utama, hasil_pmi):
-    """Membuat kesimpulan berbasis logika dari hasil analisis."""
+    # (Biarkan kode narasi otomatis yang lama di sini, tidak perlu diubah)
     if not konsep_utama or not hasil_pmi:
-        return "Analisis belum menghasilkan cukup data untuk disimpulkan."
-
-    # 1. Ambil 3 konsep teratas
+        return "Analisis belum menghasilkan cukup data."
     top_konsep = [k['konsep'] for k in konsep_utama[:3]]
     teks_konsep = ", ".join(top_konsep[:-1]) + f", dan {top_konsep[-1]}" if len(top_konsep) > 1 else top_konsep[0]
-    
-    # 2. Ambil 3 pasangan kata terkuat (berdasarkan frekuensi & PMI)
     top_pasangan = hasil_pmi[:3]
-    frasa_kuat = []
-    for p in top_pasangan:
-        frasa_kuat.append(f"'{p['kata_a']}' dengan '{p['kata_b']}' (muncul {p['frekuensi']} kali)")
-    
+    frasa_kuat = [f"'{p['kata_a']}' dengan '{p['kata_b']}'" for p in top_pasangan]
     teks_frasa = "; ".join(frasa_kuat[:-1]) + f"; dan {frasa_kuat[-1]}" if len(frasa_kuat) > 1 else frasa_kuat[0]
-
-    # 3. Susun Narasi
-    narasi = (
-        f"Berdasarkan hasil tempaan analisis terhadap {len(daftar_file)} dokumen dalam proyek **{nama_proyek}**, "
-        f"sistem menemukan bahwa fokus utama pembahasan terletak pada konsep {teks_konsep}.\n\n"
-        f"Lebih lanjut, jika dilihat dari pola kedekatan kata (PMI), dokumen ini secara konsisten "
-        f"menghubungkan {teks_frasa}. Hal ini mengindikasikan bahwa inti dari pembahasan dokumen "
-        f"sangat berkaitan erat dengan relasi antar-konsep tersebut.\n\n"
-        f"Dengan demikian, maksud dan tujuan dari data yang dianalisis ini berpusat pada bagaimana "
-        f"konsep {top_konsep[0]} beroperasi dan berhubungan langsung dengan {top_konsep[1] if len(top_konsep) > 1 else 'konteks lainnya'}."
+    
+    return (
+        f"Berdasarkan hasil tempaan analisis terhadap {len(daftar_file)} dokumen dalam proyek {nama_proyek}, "
+        f"sistem menemukan bahwa fokus utama pembahasan terletak pada konsep {teks_konsep}. "
+        f"Pola kedekatan kata (PMI) menunjukkan hubungan konsisten antara {teks_frasa}. "
+        f"Hal ini mengindikasikan bahwa inti dari pembahasan dokumen sangat berkaitan erat dengan relasi antar-konsep tersebut."
     )
-    return narasi
 
-def buat_laporan_word(nama_proyek, tanggal, daftar_file, konsep_utama, hasil_pmi):
+def buat_laporan_word_jurnal(nama_proyek, tanggal, daftar_file, konsep_utama, hasil_pmi, paket_jurnal_ai):
     doc = docx.Document()
     
-    # Judul
-    doc.add_heading(f'Laporan Analisis: {nama_proyek}', 0)
-    doc.add_paragraph(f'Tanggal Analisis: {tanggal}')
-    doc.add_paragraph(f'Dokumen yang dianalisis: {", ".join(daftar_file)}')
+    # Set Font Default (Times New Roman 12)
+    style = doc.styles['Normal']
+    font = style.font
+    font.name = 'Times New Roman'
+    font.size = Pt(12)
+
+    # 1. Judul & Metadata (Placeholder)
+    doc.add_heading('Draf Artikel Jurnal Internasional (Scopus Q1/Q2)', 0)
+    doc.add_paragraph(f"Proyek Analisis: {nama_proyek}")
+    doc.add_paragraph(f"Tanggal Generate: {tanggal}")
+    doc.add_paragraph(f"Sumber Dokumen: {', '.join(daftar_file)}")
     
-    # === FITUR BARU: NARASI OTOMATIS ===
-    doc.add_heading('Kesimpulan Eksekutif (Narasi Otomatis)', level=1)
+    doc.add_heading('1. Rekomendasi Judul & Abstrak (AI Generated)', level=1)
+    doc.add_paragraph(paket_jurnal_ai)
+    
+    doc.add_heading('2. Hasil Analisis Kuantitatif Teks (Kamasan Engine)', level=1)
+    
+    # Narasi Otomatis
     narasi = buat_narasi_otomatis(nama_proyek, daftar_file, konsep_utama, hasil_pmi)
-    # Bersihkan format markdown bold (**) agar rapi di Word
-    narasi_bersih = narasi.replace("**", "")
-    doc.add_paragraph(narasi_bersih)
+    doc.add_paragraph(narasi)
     
     # Konsep Utama
-    doc.add_heading('Konsep Utama', level=1)
+    doc.add_heading('Konsep Utama Terdeteksi', level=2)
     for k in konsep_utama:
         doc.add_paragraph(f"{k['konsep']} (Skor: {k['skor']:.2f})", style='List Bullet')
         
     # Tabel PMI
-    doc.add_heading('Tabel Hubungan Konsep (PMI)', level=1)
+    doc.add_heading('Matriks Hubungan Konsep (PMI)', level=2)
     if hasil_pmi:
         df = pd.DataFrame(hasil_pmi)
         table = doc.add_table(rows=1, cols=len(df.columns))
