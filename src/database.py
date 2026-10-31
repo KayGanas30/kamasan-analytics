@@ -32,12 +32,10 @@ def init_db():
         )
     ''')
     
-    # Masukkan default kata jika kosong
-    cursor.execute('SELECT COUNT(*) FROM kamus_lokal')
-    if cursor.fetchone()[0] == 0:
-        default_kata = ["noken", "patuans", "oap", "lemasa", "anak adat", "musyawarah", "perdasus", "perdasi"]
-        for k in default_kata:
-            cursor.execute('INSERT INTO kamus_lokal (kata) VALUES (?)', (k,))
+    # Masukkan default kata jika kosong (Gunakan INSERT OR IGNORE)
+    default_kata = ["noken", "patuans", "oap", "lemasa", "anak adat", "musyawarah", "perdasus", "perdasi"]
+    for k in default_kata:
+        cursor.execute('INSERT OR IGNORE INTO kamus_lokal (kata) VALUES (?)', (k,))
             
     conn.commit()
     conn.close()
