@@ -56,7 +56,7 @@ with st.sidebar:
     # --- SISTEM KEAMANAN ---
     st.markdown("---")
     sandi_admin = st.text_input("🔒 Akses Admin (Kosongkan jika tamu)", type="password", help="Masukkan sandi untuk membuka fitur hapus.")
-    is_admin = (sandi_admin == "kamasan2026") 
+    is_admin = (sandi_admin == "kamasanParang26") 
     st.markdown("---")
     
     # --- PENGATURAN AI (API KEY) ---
@@ -64,6 +64,17 @@ with st.sidebar:
     api_key_tersimpan = ambil_pengaturan("groq_api_key", "")
     api_key_input = st.text_input("Groq API Key:", value=api_key_tersimpan, type="password", help="Dapatkan di console.groq.com")
     if st.button("Simpan API Key"):
+    st.markdown("---")
+    st.markdown("### 🗑️ Cache & Memori")
+    if st.button("Hapus Cache AI"):
+        # Hapus semua session state terkait AI
+        keys_to_remove = ['paket_jurnal_ai', 'draf_final', 'review_ai', 'hasil_baru']
+        for key in keys_to_remove:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.success("Cache berhasil dihapus!")
+        st.rerun()
+    st.markdown("---")
         simpan_pengaturan("groq_api_key", api_key_input)
         st.success("API Key disimpan!")
     st.markdown("---")
@@ -145,7 +156,7 @@ if 'view_riwayat' in st.session_state:
             st.error("⚠️ API Key Groq belum diatur. Silakan atur di sidebar kiri terlebih dahulu.")
         else:
             # Membuat Tab di dalam Halaman Riwayat
-            co_tab1, co_tab2, co_tab3, co_tab4 = st.tabs(["📝 Generator Draf", "📚 Referensi Riil", "🧐 Review Jurnal", "🔍 Cek Plagiarisme"])
+                        co_tab1, co_tab2, co_tab3, co_tab4, co_tab5 = st.tabs(["📝 Generator Draf", "📚 Referensi Riil", "🧐 Review Jurnal", "🔍 Cek Plagiarisme", "⚖️ Bandingkan Dokumen"])
             
             with co_tab1:
                 st.write("Ubah hasil analisis ini menjadi draf jurnal siap publikasi (Format IMRaD).")
@@ -242,7 +253,34 @@ if 'view_riwayat' in st.session_state:
                                 st.info(hasil_cek)
                         else:
                             st.warning("Silakan buat Draf Final di Tab 'Generator Draf' terlebih dahulu.")
+                         with co_tab5:
+                st.write("Bandingkan hasil analisis ini dengan riwayat lain untuk melihat perbedaan konsep dan hubungan antar kata.")
+                riwayat_lain = ambil_semua_riwayat()
+                opsi_banding = {f"{r[1]} ({r[2][:10]})": r[0] for r in riwayat_lain if r[0] != id_riwayat}
+                
+                if not opsi_banding:
+                    st.info("Belum ada riwayat lain untuk dibandingkan.")
+                else:
+                    pilihan_banding = st.selectbox("Pilih Riwayat Pembanding:", list(opsi_banding.keys()), key="banding")
+                    
+                    if st.button("Bandingkan Sekarang"):
+                        id_banding = opsi_banding[pilihan_banding]
+                        detail_banding = ambil_detail_riwayat(id_banding)
+                        
+                        if detail_banding:
+                            st.markdown(f"### Perbandingan: {nama_proyek} vs {detail_banding['nama_proyek']}")
                             
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown(f"#### 📁 {nama_proyek}")
+                                for k in detail['konsep_utama'][:5]:
+                                    st.write(f"- {k['konsep']}")
+                            with col2:
+                                st.markdown(f"#### 📁 {detail_banding['nama_proyek']}")
+                                for k in detail_banding['konsep_utama'][:5]:
+                                    st.write(f"- {k['konsep']}")
+                                    
+                            st.info("💡 Analisis lebih lanjut: Konsep yang sama menunjukkan kesinambungan isu. Konsep yang berbeda menunjukkan pergeseran fokus atau perbedaan topik.")               
         st.divider()
         
         # --- KESIMPULAN & VISUALISASI ---
