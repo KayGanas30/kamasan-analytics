@@ -178,3 +178,119 @@ Tulis draf lengkap berdasarkan Opsi Ide Terbaik. Gunakan heading berikut (tanpa 
         return response.choices[0].message.content
     except Exception as e:
         return f"Gagal membuat paket jurnal: {e}"
+def pilih_opsi_dan_buat_draf(nama_proyek, konsep_utama, hasil_pmi, target_jurnal, bidang_ilmu, sudut_pandang, opsi_terpilih):
+    """Membuat draf IMRaD berdasarkan opsi ide yang dipilih pengguna."""
+    client = dapatkan_client_groq()
+    if not client:
+        return "API Key Groq belum diatur."
+        
+    konteks_konsep = ", ".join([k['konsep'] for k in konsep_utama[:15]])
+    konteks_pmi = "\n".join([f"- {p['kata_a']} berhubungan dengan {p['kata_b']} (Frek: {p['frekuensi']})" for p in hasil_pmi[:10]])
+
+    prompt = f"""Anda adalah Professor Hukum dan Editor Jurnal Internasional (Scopus Q1/Q2).
+Data hasil analisis:
+Nama Proyek: {nama_proyek}
+Konsep Kunci: {konteks_konsep}
+Hubungan Konsep: {konteks_pmi}
+
+Target Jurnal: {target_jurnal}
+Bidang: {bidang_ilmu}
+Sudut Pandang: {sudut_pandang}
+
+IDE TERPILIH:
+{opsi_terpilih}
+
+Tugas: Tulis draf artikel jurnal lengkap menggunakan format IMRaD standar (Title, Abstract, Introduction, Methods, Results and Discussion, Conclusion, References). Gunakan bahasa akademik tingkat tinggi, spesifik, dan siap publikasi. Jangan gunakan bullet points, gunakan paragraf yang mengalir."""
+    
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="openai/gpt-oss-120b",
+            temperature=0.4
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Gagal membuat draf: {e}"
+
+def cari_referensi_riil(konsep_utama):
+    """Mencari referensi riil menggunakan Semantic Scholar API."""
+    import requests
+    query = " ".join([k['konsep'] for k in konsep_utama[:3]])
+    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit=5&fields=title,authors,year,url"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        if 'data' in data and data['data']:
+            hasil = "### 📚 Referensi Riil (Ditemukan AI):\n"
+            for paper in data['data']:
+                authors = ", ".join([a['name'] for a in paper.get('authors', [])])
+                hasil += f"- {authors} ({paper.get('year', 'N/A')}). **{paper['title']}**. [Link]({paper.get('url', '#')})\n"
+            return hasil
+        else:
+            return "Tidak ada referensi yang ditemukan untuk konsep ini."
+    except Exception as e:
+        return f"Gagal mencari referensi: {e}"
+
+def review_jurnal_otomatis(teks_draf, target_jurnal):
+    """Bertindak sebagai Reviewer Jurnal dan memberikan catatan revisi."""
+    client = dapatkan_client_groq()
+    if not client:
+        return "API Key belum diatur."
+        
+    prompt = f"""Anda adalah Reviewer Senior untuk jurnal {target_jurnal} (Scopus Q1/Q2).
+Tugas Anda adalah mereview draf artikel berikut dan memberikan catatan kritis agar bisa lolos publikasi.
+
+DRAF ARTIKEL:
+{teks_draf[:3000]} # Dibatasi 3000 karakter pertama untuk menghemat token
+
+Berikan review dalam format:
+1. **Ringkasan Penilaian**: Apakah artikel ini layak dilanjutkan? (1 paragraf)
+2. **Kekuatan Utama**: 2-3 poin kekuatan artikel.
+3. **Kelemahan & Saran Revisi**: 3-4 poin kritis yang harus diperbaiki (metodologi, teori, data, dll).
+4. **Rekomendasi Akhir**: (Accept / Minor Revision / Major Revision / Reject).
+"""
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="openai/gpt-oss-120b",
+            temperature=0.3
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Gagal melakukan review: {e}"
+
+def cek_plagiarisme_dasar(teks_baru, id_riwayat_lama):
+    """Membandingkan draf baru dengan draf lama menggunakan Cosine Similarity."""
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    from src.database import ambil_detail_riwayat
+    import json
+
+    detail_lama = ambil_detail_riwayat(id_riwayat_lama)
+    if not detail_lama:
+        return "Data lama tidak ditemukan."
+        
+    # Ambil teks dari riwayat lama (menggunakan narasi otomatis sebagai proxy)
+    from src.reporting import buat_narasi_otomatis
+    teks_lama = buat_narasi_otomatis(
+        detail_lama['nama_proyek'], detail_lama['daftar_file'], 
+        detail_lama['konsep_utama'], detail_lama['hasil_pmi']
+    )
+    
+    vectorizer = TfidfVectorizer()
+    try:
+        tfidf_matrix = vectorizer.fit_transform([teks_baru, teks_lama])
+        skor = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+        persentase = round(skor * 100, 2)
+        
+        if persentase > 70:
+            status = "🔴 TINGGI (Risiko Plagiarisme)"
+        elif persentase > 40:
+            status = "🟡 SEDANG (Perlu Parafrase)"
+        else:
+            status = "🟢 RENDAH (Aman)"
+            
+        return f"Skor Kemiripan: **{persentase}%**\nStatus: {status}\n\n*(Dibandingkan dengan proyek: {detail_lama['nama_proyek']})*"
+    except Exception as e:
+        return f"Gagal mengecek: {e}"

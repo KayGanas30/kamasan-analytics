@@ -7,7 +7,8 @@ DB_PATH = "kamasan_data.db"
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    # Tabel Riwayat
+    
+    # 1. Tabel Riwayat
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS riwayat_analisis (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -18,13 +19,15 @@ def init_db():
             hasil_pmi TEXT
         )
     ''')
-    # Tabel Kamus Lokal
+    
+    # 2. Tabel Kamus Lokal
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS kamus_lokal (
             id INTEGER PRIMARY KEY AUTOINCREMENT, kata TEXT UNIQUE
         )
     ''')
-    # Tabel Pengaturan (Untuk API Key)
+    
+    # 3. Tabel Pengaturan (Untuk API Key)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS pengaturan (
             kunci TEXT PRIMARY KEY,
@@ -32,7 +35,17 @@ def init_db():
         )
     ''')
     
-    # Masukkan default kata jika kosong (Gunakan INSERT OR IGNORE)
+    # 4. Tabel Review Jurnal (INI YANG BARU DITAMBAHKAN)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS review_jurnal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_riwayat INTEGER,
+            catatan_review TEXT,
+            tanggal_review TEXT
+        )
+    ''')
+    
+    # Masukkan default kata jika kosong
     default_kata = ["noken", "patuans", "oap", "lemasa", "anak adat", "musyawarah", "perdasus", "perdasi"]
     for k in default_kata:
         cursor.execute('INSERT OR IGNORE INTO kamus_lokal (kata) VALUES (?)', (k,))
@@ -136,3 +149,22 @@ def simpan_pengaturan(kunci, nilai):
     ''', (kunci, nilai))
     conn.commit()
     conn.close()
+def simpan_review_jurnal(id_riwayat, catatan_review):
+    """Menyimpan catatan review AI untuk draf jurnal tertentu."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO review_jurnal (id_riwayat, catatan_review, tanggal_review) 
+        VALUES (?, ?, ?)
+    ''', (id_riwayat, catatan_review, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+def ambil_review_jurnal(id_riwayat):
+    """Mengambil catatan review terakhir."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT catatan_review FROM review_jurnal WHERE id_riwayat = ? ORDER BY id DESC LIMIT 1', (id_riwayat,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else None
