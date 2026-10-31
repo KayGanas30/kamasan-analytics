@@ -12,7 +12,8 @@ from src.visualization import buat_graf_konsep, tampilkan_graf_di_streamlit
 from src.database import (init_db, simpan_analisis, ambil_semua_riwayat, 
                           ambil_detail_riwayat, ambil_kamus_lokal, 
                           tambah_kamus_lokal, hapus_kamus_lokal, hapus_riwayat)
-from src.reporting import buat_laporan_word, buat_narasi_otomatis
+from src.reporting import buat_laporan_word_jurnal, buat_narasi_otomatis
+from src.ai_helper import tanya_ai_analisis, dapatkan_client_groq, buat_ringkasan_ai, kategorisasi_konsep_ai, generate_jurnal_package
 from src.ai_helper import tanya_ai
 
 st.set_page_config(page_title="Kamasan Analytics", page_icon="🔨", layout="wide")
@@ -94,7 +95,35 @@ if 'view_riwayat' in st.session_state:
             st.rerun()
             
         narasi = buat_narasi_otomatis(nama_proyek, detail['daftar_file'], detail['konsep_utama'], detail['hasil_pmi'])
-
+        st.divider()
+        st.markdown("### 🎓 Generator Artikel Jurnal (Scopus Q1/Q2)")
+        st.write("Gunakan AI untuk merumuskan judul, abstrak, dan rekomendasi reviewer untuk jurnal hukum internasional.")
+        
+        if st.button("✨ Buat Draf Jurnal & Reviewer Notes", type="primary"):
+            with st.spinner("Profesor AI sedang menyusun draf jurnal..."):
+                paket_jurnal = generate_jurnal_package(nama_proyek, detail['konsep_utama'], detail['hasil_pmi'])
+                st.session_state['paket_jurnal_ai'] = paket_jurnal
+                
+        if 'paket_jurnal_ai' in st.session_state:
+            st.info(st.session_state['paket_jurnal_ai'])
+            
+            # Tombol Download Word Khusus Jurnal
+            word_jurnal = buat_laporan_word_jurnal(
+                nama_proyek, detail['tanggal'], detail['daftar_file'], 
+                detail['konsep_utama'], detail['hasil_pmi'], 
+                st.session_state['paket_jurnal_ai']
+            )
+            st.download_button(
+                label="⬇️ Download Draf Jurnal (Word)",
+                data=word_jurnal,
+                file_name=f"Draf_Jurnal_{nama_file_aman}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                type="primary"
+            )
+        st.divider()
+        
+        st.markdown("### 📊 Tabel PMI")
+        # (Kode tabel PMI ke bawah biarkan seperti sebelumnya)
         st.markdown("### 📝 Kesimpulan Eksekutif")
         st.info(narasi)
         
@@ -214,15 +243,43 @@ with tab2:
 if tab3 is not None:
     with tab3:
         st.subheader("📖 Kamus Istilah Lokal")
-        st.write("Tambahkan istilah khusus (seperti nama marga, nama tempat, atau bahasa daerah) agar sistem tidak membuangnya saat analisis.")
+        st.write("Tambahkan istilah khusus agar sistem tidak membuangnya saat analisis.")
         
+        # --- FITUR IMPOR MASSAL ---
+        st.markdown("### 📥 Impor Massal (Copy-Paste)")
+        st.write("Pisahkan setiap kata dengan koma, spasi, atau enter.")
+        
+        teks_massal = st.text_area("Tempel daftar kata di sini:", height=150)
+        
+        if st.button("🚀 Impor Semua ke Kamus", type="primary"):
+            if teks_massal:
+                import re
+                # Memisahkan teks berdasarkan koma, enter, atau spasi
+                daftar_kata = re.split(r'[,\n\s]+', teks_massal)
+                daftar_kata = [k.strip().lower() for k in daftar_kata if k.strip()]
+                
+                berhasil = 0
+                gagal = 0
+                for k in daftar_kata:
+                    if tambah_kamus_lokal(k):
+                        berhasil += 1
+                    else:
+                        gagal += 1
+                
+                st.success(f"Selesai! {berhasil} istilah baru ditambahkan. ({gagal} istilah sudah ada).")
+                st.rerun()
+                
+        st.divider()
+        
+        # --- TAMBAH SATU PER SATU ---
+        st.markdown("### ➕ Tambah Satu Istilah")
         col_input, col_btn = st.columns([3, 1])
         with col_input:
-            kata_baru = st.text_input("Tambah istilah baru:", placeholder="Contoh: wamena, Dani, noken")
+            kata_baru = st.text_input("Istilah baru:", placeholder="Contoh: wamena, Dani, noken")
         with col_btn:
             st.write("") 
             st.write("")
-            if st.button("➕ Tambah", use_container_width=True):
+            if st.button("Tambah", use_container_width=True):
                 if kata_baru:
                     if tambah_kamus_lokal(kata_baru):
                         st.success(f"Istilah '{kata_baru}' berhasil ditambahkan!")
@@ -232,18 +289,18 @@ if tab3 is not None:
                         
         st.divider()
         
+        # --- DAFTAR ISTILAH ---
         st.markdown("### Daftar Istilah Saat Ini")
         kamus_sekarang = ambil_kamus_lokal()
         if not kamus_sekarang:
             st.info("Kamus masih kosong.")
         else:
-            for k in kamus_sekarang:
+            for k in sorted(kamus_sekarang):
                 col_kata, col_hapus = st.columns([4, 1])
                 col_kata.write(f"• **{k.capitalize()}**")
                 if col_hapus.button("Hapus 🗑️", key=f"del_kamus_{k}"):
                     hapus_kamus_lokal(k)
                     st.rerun()
-
 # === TAB 4: TANYA AI ===
 with tab4:
     st.subheader("🤖 Tanya Jawab Dokumen dengan AI")
