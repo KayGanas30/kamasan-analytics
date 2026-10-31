@@ -7,6 +7,7 @@ DB_PATH = "kamasan_data.db"
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    # Tabel Riwayat
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS riwayat_analisis (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -17,11 +18,21 @@ def init_db():
             hasil_pmi TEXT
         )
     ''')
+    # Tabel Kamus Lokal
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS kamus_lokal (
             id INTEGER PRIMARY KEY AUTOINCREMENT, kata TEXT UNIQUE
         )
     ''')
+    # Tabel Pengaturan (Untuk API Key)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pengaturan (
+            kunci TEXT PRIMARY KEY,
+            nilai TEXT
+        )
+    ''')
+    
+    # Masukkan default kata jika kosong
     cursor.execute('SELECT COUNT(*) FROM kamus_lokal')
     if cursor.fetchone()[0] == 0:
         default_kata = ["noken", "patuans", "oap", "lemasa", "anak adat", "musyawarah", "perdasus", "perdasi"]
@@ -31,6 +42,7 @@ def init_db():
     conn.commit()
     conn.close()
 
+# --- FUNGSI RIWAYAT ---
 def simpan_analisis(nama_proyek, daftar_file, konsep_utama, hasil_pmi):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -72,13 +84,13 @@ def ambil_detail_riwayat(id_riwayat):
     return None
 
 def hapus_riwayat(id_riwayat):
-    """Menghapus data riwayat berdasarkan ID."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('DELETE FROM riwayat_analisis WHERE id = ?', (id_riwayat,))
     conn.commit()
     conn.close()
 
+# --- FUNGSI KAMUS LOKAL ---
 def ambil_kamus_lokal():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -103,5 +115,24 @@ def hapus_kamus_lokal(kata):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('DELETE FROM kamus_lokal WHERE kata = ?', (kata,))
+    conn.commit()
+    conn.close()
+
+# --- FUNGSI PENGATURAN (API KEY) ---
+def ambil_pengaturan(kunci, default=None):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT nilai FROM pengaturan WHERE kunci = ?', (kunci,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else default
+
+def simpan_pengaturan(kunci, nilai):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO pengaturan (kunci, nilai) VALUES (?, ?)
+        ON CONFLICT(kunci) DO UPDATE SET nilai=excluded.nilai
+    ''', (kunci, nilai))
     conn.commit()
     conn.close()
