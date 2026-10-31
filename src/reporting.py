@@ -1,5 +1,5 @@
 import docx
-from docx.shared import Pt, Inches
+from docx.shared import Pt
 import io
 import pandas as pd
 
@@ -36,7 +36,7 @@ def buat_laporan_word_jurnal(nama_proyek, tanggal, daftar_file, konsep_utama, ha
         return file_stream
     # ---------------------------
 
-    # Hapus metadata internal
+    # Hapus metadata internal dan bersihkan Markdown
     teks_bersih = paket_jurnal_ai.replace("**", "").replace("# ", "").replace("## ", "")
     
     for baris in teks_bersih.split('\n'):
