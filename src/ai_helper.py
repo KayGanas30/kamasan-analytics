@@ -1,37 +1,92 @@
+import streamlit as st
 from groq import Groq
+from src.database import ambil_pengaturan, simpan_pengaturan
 
-def tanya_ai(konteks_dokumen, pertanyaan_user, api_key):
+def dapatkan_client_groq():
+    """Mengambil client Groq dari API key yang tersimpan."""
+    api_key = ambil_pengaturan("groq_api_key")
     if not api_key:
-        return "API Key belum dimasukkan."
+        return None
+    return Groq(api_key=api_key)
+
+def tanya_ai_analisis(pertanyaan, nama_proyek, konsep_utama, hasil_pmi):
+    """Mengirim pertanyaan ke AI beserta konteks hasil analisis."""
+    client = dapatkan_client_groq()
+    if not client:
+        return "⚠️ API Key Groq belum diatur. Silakan atur di menu Pengaturan AI."
+    
+    konteks_konsep = ", ".join([f"{k['konsep']} (skor {k['skor']:.2f})" for k in konsep_utama[:10]])
+    konteks_pmi = "\n".join([f"- {p['kata_a']} berhubungan dengan {p['kata_b']} (muncul {p['frekuensi']}x)" for p in hasil_pmi[:10]])
+    
+    prompt_sistem = f"""Anda adalah asisten peneliti cerdas bernama Kamasan AI. 
+Anda membantu menganalisis dokumen untuk proyek berjudul '{nama_proyek}'.
+Berikut adalah hasil ekstraksi teks dari dokumen tersebut:
+Konsep Utama: {konteks_konsep}
+Hubungan Konsep (PMI):
+{konteks_pmi}
+
+Jawablah pertanyaan pengguna HANYA berdasarkan data hasil ekstraksi di atas. 
+Jawab dengan bahasa Indonesia yang akademis, jelas, dan ringkas."""
 
     try:
-        client = Groq(api_key=api_key)
-        
-        # Batasi konteks agar tidak melebihi limit token
-        konteks_terbatas = konteks_dokumen[:15000] 
-
-        prompt_sistem = (
-            "Anda adalah Kamasan AI, asisten peneliti yang cerdas. "
-            "Jawablah pertanyaan pengguna HANYA berdasarkan konteks dokumen yang diberikan. "
-            "Jika jawabannya tidak ada di dokumen, katakan 'Maaf, informasi tersebut tidak ditemukan dalam dokumen.' "
-            "Gunakan bahasa Indonesia yang formal, ringkas, dan akademis."
-        )
-        
-        prompt_user = f"Konteks Dokumen:\n{konteks_terbatas}\n\nPertanyaan: {pertanyaan_user}"
-
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": prompt_sistem},
-                {"role": "user", "content": prompt_user}
+                {"role": "user", "content": pertanyaan}
             ],
-            model="openai/gpt-oss-120b", 
-            temperature=0.3, 
+            model="openai/gpt-oss-120b",
+            temperature=0.3,
         )
-        
         return chat_completion.choices[0].message.content
-        
     except Exception as e:
-        return f"Terjadi kesalahan pada AI: {str(e)}"
+        return f"⚠️ Terjadi kesalahan saat menghubungi AI: {e}"
+
+def buat_ringkasan_ai(nama_proyek, konsep_utama, hasil_pmi):
+    """Meminta AI membuat paragraf kesimpulan yang natural."""
+    client = dapatkan_client_groq()
+    if not client:
+        return "API Key belum diatur, tidak bisa membuat ringkasan AI."
+        
+    konteks = f"Proyek: {nama_proyek}\nKonsep Utama: {', '.join([k['konsep'] for k in konsep_utama[:10]])}\n"
+    if hasil_pmi:
+        konteks += f"Hubungan Terkuat: {hasil_pmi[0]['kata_a']} - {hasil_pmi[0]['kata_b']} ({hasil_pmi[0]['frekuensi']}x)"
+    
+    prompt = f"""Buatlah 1 paragraf ringkasan eksekutif (executive summary) yang tajam dan akademis berdasarkan data analisis teks berikut:
+{konteks}
+Jelaskan apa maksud dan tujuan utama dari dokumen yang dianalisis ini. Jangan gunakan bullet points, buat dalam bentuk paragraf yang mengalir."""
+
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="openai/gpt-oss-120b",
+            temperature=0.4
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Gagal membuat ringkasan AI: {e}"
+
+def kategorisasi_konsep_ai(konsep_utama):
+    """Meminta AI mengelompokkan konsep ke dalam kategori."""
+    client = dapatkan_client_groq()
+    if not client:
+        return "API Key belum diatur."
+        
+    daftar_konsep = [k['konsep'] for k in konsep_utama]
+    prompt = f"""Kelompokkan konsep-konsep berikut ke dalam kategori yang logis (maksimal 4 kategori, misal: Hukum, Adat, Politik, Ekonomi). 
+Konsep: {', '.join(daftar_konsep)}
+Berikan jawaban dalam format:
+Kategori 1: konsep_a, konsep_b
+Kategori 2: konsep_c, konsep_d"""
+
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="openai/gpt-oss-120b",
+            temperature=0.2
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Gagal: {e}"
 
 def generate_jurnal_package(nama_proyek, konsep_utama, hasil_pmi):
     """Menghasilkan Judul, Abstrak, dan Rekomendasi Reviewer untuk Jurnal Hukum."""
