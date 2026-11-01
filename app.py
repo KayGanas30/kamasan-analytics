@@ -597,27 +597,34 @@ if tab5 is not None:
     with tab5:
         st.subheader("👥 Manajemen User")
         
+        # --- TAMBAH USER BARU ---
         st.markdown("### ➕ Tambah User Baru")
-        col1, col2, col3 = st.columns(3)
+        
+        # Ubah menjadi 4 kolom untuk menampung Password
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             new_user = st.text_input("Username Baru:")
         with col2:
             new_name = st.text_input("Nama Lengkap:")
         with col3:
+            new_password = st.text_input("Password Sementara:", type="password", value="kamasan123", help="Dosen bisa mengganti ini nanti di sidebar.")
+        with col4:
             new_role = st.selectbox("Role:", ["dosen", "admin"])
         
         if st.button("Tambah User"):
-            if new_user and new_name:
-                if tambah_user(new_user, new_name, "kamasan123", new_role):
-                    st.success(f"User {new_user} berhasil ditambahkan. Password standar: kamasan123")
+            if new_user and new_name and new_password:
+                # Gunakan password yang diinput, bukan hardcode 'kamasan123'
+                if tambah_user(new_user, new_name, new_password, new_role):
+                    st.success(f"User {new_user} berhasil ditambahkan dengan password sementara. Silakan informasikan ke dosen yang bersangkutan.")
                     st.rerun()
                 else:
                     st.warning("Username sudah digunakan.")
             else:
-                st.warning("Harap isi semua kolom.")
+                st.warning("Harap isi semua kolom (Username, Nama, dan Password).")
         
         st.divider()
         
+        # --- DAFTAR USER ---
         st.markdown("### Daftar User Saat Ini")
         users = ambil_semua_users()
         for u in users:
