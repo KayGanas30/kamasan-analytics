@@ -1,6 +1,7 @@
 import sqlite3
 import json
 from datetime import datetime
+import bcrypt
 
 DB_PATH = "kamasan_data.db"
 
@@ -12,6 +13,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS riwayat_analisis (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            username TEXT,
             nama_proyek TEXT,
             tanggal TEXT,
             daftar_file TEXT, 
@@ -35,7 +37,7 @@ def init_db():
         )
     ''')
     
-    # 4. Tabel Review Jurnal (INI YANG BARU DITAMBAHKAN)
+    # 4. Tabel Review Jurnal
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS review_jurnal (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,6 +46,23 @@ def init_db():
             tanggal_review TEXT
         )
     ''')
+    
+    # 5. Tabel Users (Untuk Multi-User)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            name TEXT,
+            password_hash TEXT,
+            role TEXT
+        )
+    ''')
+    
+    # Buat user admin default jika belum ada
+    cursor.execute('SELECT COUNT(*) FROM users')
+    if cursor.fetchone()[0] == 0:
+        hashed_pw = bcrypt.hashpw('admin123'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        cursor.execute('INSERT INTO users (username, name, password_hash, role) VALUES (?, ?, ?, ?)', 
+                       ("admin", "Administrator", hashed_pw, "admin"))
     
     # Masukkan default kata jika kosong
     default_kata = ["noken", "patuans", "oap", "lemasa", "anak adat", "musyawarah", "perdasus", "perdasi"]
@@ -54,26 +73,20 @@ def init_db():
     conn.close()
 
 # --- FUNGSI RIWAYAT ---
-def simpan_analisis(nama_proyek, daftar_file, konsep_utama, hasil_pmi):
+def simpan_analisis(username, nama_proyek, daftar_file, konsep_utama, hasil_pmi):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO riwayat_analisis (nama_proyek, tanggal, daftar_file, konsep_utama, hasil_pmi) 
-        VALUES (?, ?, ?, ?, ?)
-    ''', (
-        nama_proyek,
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-        json.dumps(daftar_file), 
-        json.dumps(konsep_utama), 
-        json.dumps(hasil_pmi)
-    ))
+        INSERT INTO riwayat_analisis (username, nama_proyek, tanggal, daftar_file, konsep_utama, hasil_pmi) 
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (username, nama_proyek, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), json.dumps(daftar_file), json.dumps(konsep_utama), json.dumps(hasil_pmi)))
     conn.commit()
     conn.close()
 
-def ambil_semua_riwayat():
+def ambil_semua_riwayat(username):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('SELECT id, nama_proyek, tanggal, daftar_file FROM riwayat_analisis ORDER BY id DESC')
+    cursor.execute('SELECT id, nama_proyek, tanggal, daftar_file FROM riwayat_analisis WHERE username = ? ORDER BY id DESC', (username,))
     rows = cursor.fetchall()
     conn.close()
     return rows
@@ -111,7 +124,6 @@ def ambil_kamus_lokal():
     return [r[0] for r in rows]
 
 def tambah_kamus_lokal(kata_baru):
-    """Menambahkan kata ke kamus. Mengembalikan True jika berhasil, False jika sudah ada."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
@@ -119,7 +131,6 @@ def tambah_kamus_lokal(kata_baru):
         conn.commit()
         return True
     except sqlite3.IntegrityError:
-        # Jika kata sudah ada, jangan lempar error, tapi kembalikan False
         return False
     finally:
         conn.close()
@@ -149,8 +160,9 @@ def simpan_pengaturan(kunci, nilai):
     ''', (kunci, nilai))
     conn.commit()
     conn.close()
+
+# --- FUNGSI REVIEW JURNAL ---
 def simpan_review_jurnal(id_riwayat, catatan_review):
-    """Menyimpan catatan review AI untuk draf jurnal tertentu."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
@@ -161,10 +173,48 @@ def simpan_review_jurnal(id_riwayat, catatan_review):
     conn.close()
 
 def ambil_review_jurnal(id_riwayat):
-    """Mengambil catatan review terakhir."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT catatan_review FROM review_jurnal WHERE id_riwayat = ? ORDER BY id DESC LIMIT 1', (id_riwayat,))
     row = cursor.fetchone()
     conn.close()
     return row[0] if row else None
+
+# --- FUNGSI USER MANAGEMENT ---
+def ambil_semua_users():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT username, name, role FROM users')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+def tambah_user(username, name, password, role="dosen"):
+    hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute('INSERT INTO users (username, name, password_hash, role) VALUES (?, ?, ?, ?)', 
+                       (username, name, hashed_pw, role))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+def hapus_user(username):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM users WHERE username = ?', (username,))
+    conn.commit()
+    conn.close()
+
+def ubah_password(username, password_baru):
+    hashed_pw = bcrypt.hashpw(password_baru.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('UPDATE users SET password_hash = ? WHERE username = ?', (hashed_pw, username))
+    conn.commit()
+    conn.close()
+    return True

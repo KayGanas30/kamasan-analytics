@@ -3,6 +3,11 @@ from groq import Groq
 from src.database import ambil_pengaturan, simpan_pengaturan
 import os
 import PyPDF2
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
 def dapatkan_client_groq():
     api_key = ambil_pengaturan("groq_api_key")
@@ -11,7 +16,6 @@ def dapatkan_client_groq():
     return Groq(api_key=api_key)
 
 def baca_template_jurnal(file_path="assets/template_jurnal.pdf"):
-    """Membaca teks dari file template jurnal (jika ada)."""
     if not os.path.exists(file_path):
         return ""
     try:
@@ -101,36 +105,6 @@ Kategori 2: konsep_c, konsep_d"""
     except Exception as e:
         return f"Gagal: {e}"
 
-def generate_jurnal_package(nama_proyek, konsep_utama, hasil_pmi):
-    client = dapatkan_client_groq()
-    if not client:
-        return None
-        
-    konteks_konsep = ", ".join([k['konsep'] for k in konsep_utama[:10]])
-    konteks_pmi = ", ".join([f"{p['kata_a']}-{p['kata_b']}" for p in hasil_pmi[:5]])
-
-    prompt = f"""Anda adalah seorang Professor of Law dan Editor-in-Chief jurnal Scopus Q1.
-Berdasarkan hasil analisis teks berikut:
-Proyek: {nama_proyek}
-Konsep Kunci: {konteks_konsep}
-Hubungan Kuat: {konteks_pmi}
-
-Tolong buatkan paket publikasi dalam format berikut (JANGAN gunakan bullet points, gunakan penomoran/heading):
-1. **3 JUDUL ARTIKEL (Gaya Hukum Internasional, beri penekanan pada novelty/ kebaruan)**: Buat judul bahasa Inggris yang akademis dan tidak plagiat.
-2. **EXECUTIVE SUMMARY (ABSTRACT)**: 1 paragraf padat (150-200 kata) berisi latar belakang, tujuan, metode analisis teks, dan temuan utama.
-3. **REKOMENDASI JURNAL (Q1/Q2)**: Sebutkan 3 jurnal hukum internasional yang cocok untuk topik ini beserta alasan singkatnya.
-4. **CATATAN REVIEWER (Reviewer's Critique)**: Berikan 3 kritik pedas namun membangun (seolah-olah Anda mereview paper ini) agar temuan ini bisa lolos Q1/Q2.
-"""
-    try:
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="openai/gpt-oss-120b",
-            temperature=0.6
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Gagal membuat paket jurnal: {e}"
-
 def buat_paket_jurnal_lengkap(nama_proyek, konsep_utama, hasil_pmi, target_jurnal, bidang_ilmu, sudut_pandang):
     client = dapatkan_client_groq()
     if not client:
@@ -138,7 +112,6 @@ def buat_paket_jurnal_lengkap(nama_proyek, konsep_utama, hasil_pmi, target_jurna
         
     konteks_konsep = ", ".join([k['konsep'] for k in konsep_utama[:15]])
     konteks_pmi = "\n".join([f"- {p['kata_a']} berhubungan dengan {p['kata_b']} (Frek: {p['frekuensi']})" for p in hasil_pmi[:10]])
-    
     template_teks = baca_template_jurnal()
 
     prompt = f"""Anda adalah seorang Professor dan Editor Jurnal Internasional Bereputasi (Scopus Q1/Q2).
@@ -161,8 +134,8 @@ Tugas Anda:
    - **Title**: Judul bahasa Inggris yang *publishable*.
    - **Abstract**: 1 paragraf (150-200 kata).
    - **Introduction**: Latar belakang, masalah, dan tujuan.
-   - **Methodology**: Jelaskan bahwa analisis menggunakan pendekatan kuantitatif-kualitatif (sebutkan *Text Mining/PMI* sebagai metode bantuan).
-   - **Results & Discussion**: Narasikan temuan dari tabel PMI dan Konsep Utama ke dalam bahasa akademik.
+   - **Methodology**: Jelaskan bahwa analisis menggunakan pendekatan kuantitatif-kualitatif (sebutkan *Text Mining/PMI*).
+   - **Results & Discussion**: Narasikan temuan dari tabel PMI dan Konsep Utama.
    - **Conclusion**: Kesimpulan dan saran.
 3. **CHECKLIST REVIEWER**: Berikan 3 catatan (Reviewer Notes) apa saja yang harus diperbaiki dosen agar sesuai dengan kriteria `{target_jurnal}`.
 
@@ -323,3 +296,32 @@ Tulis dalam bahasa akademik yang formal."""
         return response.choices[0].message.content
     except Exception as e:
         return f"Gagal melakukan sintesis: {e}"
+
+def kirim_email_laporan(email_penerima, subjek, isi_teks, lampiran_bytes=None, nama_file_lampiran="Laporan.docx"):
+    """Mengirim email dengan opsi lampiran menggunakan SMTP Gmail."""
+    try:
+        email_pengirim = st.secrets["email"]["gmail"]
+        password_pengirim = st.secrets["email"]["password"]
+        
+        msg = MIMEMultipart()
+        msg['From'] = email_pengirim
+        msg['To'] = email_penerima
+        msg['Subject'] = subjek
+        
+        msg.attach(MIMEText(isi_teks, 'plain'))
+        
+        if lampiran_bytes:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(lampiran_bytes)
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', f'attachment; filename="{nama_file_lampiran}"')
+            msg.attach(part)
+        
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(email_pengirim, password_pengirim)
+        server.send_message(msg)
+        server.quit()
+        return True, "Email berhasil dikirim!"
+    except Exception as e:
+        return False, f"Gagal mengirim email: {e}"
