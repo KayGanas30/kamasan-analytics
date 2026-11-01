@@ -6,6 +6,10 @@ import io
 import pandas as pd
 import json
 import re
+import sqlite3
+import yaml
+from yaml.loader import SafeLoader
+import streamlit_authenticator as stauth
 
 from src.preprocessing import tokenisasi, set_kamus_lokal_global
 from src.extraction import ekstrak_konsep_utama, hitung_pmi
@@ -13,53 +17,97 @@ from src.visualization import buat_graf_konsep, tampilkan_graf_di_streamlit
 from src.database import (init_db, simpan_analisis, ambil_semua_riwayat, 
                           ambil_detail_riwayat, ambil_kamus_lokal, 
                           tambah_kamus_lokal, hapus_kamus_lokal, hapus_riwayat,
-                          ambil_pengaturan, simpan_pengaturan)
+                          ambil_pengaturan, simpan_pengaturan,
+                          ambil_semua_users, tambah_user, hapus_user, ubah_password)
 from src.reporting import buat_laporan_word_jurnal, buat_narasi_otomatis
 from src.ai_helper import (tanya_ai_analisis, dapatkan_client_groq, 
                            buat_ringkasan_ai, kategorisasi_konsep_ai, 
                            generate_jurnal_package, buat_paket_jurnal_lengkap,
                            pilih_opsi_dan_buat_draf, cari_referensi_riil, 
                            review_jurnal_otomatis, cek_plagiarisme_dasar,
-                           sintesis_pengetahuan_lintas_proyek)
+                           sintesis_pengetahuan_lintas_proyek, kirim_email_laporan)
 
 st.set_page_config(page_title="Kamasan Analytics", page_icon="🔨", layout="wide")
 
-# --- PENAMPIL HASIL SEMENTARA ---
-if 'hasil_baru' in st.session_state:
-    hasil = st.session_state['hasil_baru']
-    st.success("✅ Analisis berhasil disimpan ke Riwayat!")
-    
-    st.subheader(f"🔥 Hasil Tempaan: {hasil['nama']}")
-    col_kiri, col_kanan = st.columns([1, 2])
-    with col_kiri:
-        st.markdown("### 💡 Konsep Utama")
-        for k in hasil['konsep']:
-            st.write(f"- **{k['konsep']}** (Skor: {k['skor']:.2f})")
-    with col_kanan:
-        st.markdown("### 🕸️ Peta Jaringan Konsep")
-        if hasil['pmi']:
-            html_graf = buat_graf_konsep(hasil['pmi'], hasil['konsep'])
-            tampilkan_graf_di_streamlit(html_graf)
-            
-    if st.button("Tutup Hasil Ini & Mulai Baru"):
-        del st.session_state['hasil_baru']
-        st.rerun()
-        
-    st.divider()
-
+# --- LOAD KONFIGURASI LOGIN DARI DATABASE ---
 init_db()
+
+users_db = ambil_semua_users()
+credentials = {"usernames": {}}
+for u in users_db:
+    conn = sqlite3.connect("kamasan_data.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT password_hash FROM users WHERE username = ?", (u[0],))
+    pw_hash = cursor.fetchone()[0]
+    conn.close()
+    
+    credentials["usernames"][u[0]] = {
+        "name": u[1],
+        "password": pw_hash,
+        "email": f"{u[0]}@kamasan.com"
+    }
+
+config = {
+    'credentials': credentials,
+    'cookie': {'expiry_days': 30, 'key': 'kamasan_secret_key_2026', 'name': 'kamasan_cookie'}
+}
+
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days']
+)
+
+# --- FORM LOGIN ---
+authenticator.login(
+    location='main',
+    fields={'Form name': 'Login Kamasan Analytics'}
+)
+
+name = st.session_state.get("name")
+authentication_status = st.session_state.get("authentication_status")
+username = st.session_state.get("username")
+
+if authentication_status == False:
+    st.error('Username/password salah')
+    st.stop()
+elif authentication_status == None:
+    st.warning('Silakan masukkan username dan password')
+    st.stop()
 
 # === SIDEBAR ===
 with st.sidebar:
     st.image("assets/kamasan.png", width=80)
     
-    # --- SISTEM KEAMANAN ---
-    st.markdown("---")
-    sandi_admin = st.text_input("🔒 Akses Admin (Kosongkan jika tamu)", type="password", help="Masukkan sandi untuk membuka fitur hapus.")
-    is_admin = (sandi_admin == "kamasan2026") 
-    st.markdown("---")
+    # --- LOGOUT & SAPAAN ---
+    authenticator.logout('Logout', 'sidebar')
+    st.write(f"Selamat datang, **{name}**!")
+    
+    # --- GANTI PASSWORD ---
+    with st.expander("🔑 Ganti Password"):
+        new_pw = st.text_input("Password Baru:", type="password", key="new_pw")
+        if st.button("Simpan Password Baru"):
+            if new_pw:
+                ubah_password(username, new_pw)
+                st.success("Password berhasil diubah! Silakan login ulang.")
+                authenticator.logout('Logout', 'sidebar')
+            else:
+                st.warning("Password tidak boleh kosong.")
+                
+    # --- CEK ADMIN ---
+    is_admin = False
+    if username:
+        conn = sqlite3.connect("kamasan_data.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM users WHERE username = ?", (username,))
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0] == "admin":
+            is_admin = True
     
     # --- PENGATURAN AI (API KEY) ---
+    st.markdown("---")
     st.markdown("### 🤖 Pengaturan AI")
     api_key_tersimpan = ambil_pengaturan("groq_api_key", "")
     api_key_input = st.text_input("Groq API Key:", value=api_key_tersimpan, type="password", help="Dapatkan di console.groq.com")
@@ -80,8 +128,9 @@ with st.sidebar:
         
     st.markdown("---")
     
+    # --- RIWAYAT (HANYA MILIK USER YANG LOGIN) ---
     st.markdown("### Riwayat Tempaan")
-    riwayat = ambil_semua_riwayat()
+    riwayat = ambil_semua_riwayat(username)
     if not riwayat:
         st.caption("Belum ada riwayat.")
     else:
@@ -104,7 +153,7 @@ with st.sidebar:
                     st.write("") 
     
     st.divider()
-    st.caption("Kamasan Analytics v0.9 (AI Powered)")
+    st.caption("Kamasan Analytics v1.2 (Multi-User + Email)")
 
 # === HEADER ===
 col_logo, col_title = st.columns([1, 8])
@@ -129,6 +178,29 @@ def baca_file(uploaded_file):
         doc = docx.Document(io.BytesIO(uploaded_file.read()))
         for para in doc.paragraphs: teks += para.text + "\n"
     return teks
+
+# --- PENAMPIL HASIL SEMENTARA ---
+if 'hasil_baru' in st.session_state:
+    hasil = st.session_state['hasil_baru']
+    st.success("✅ Analisis berhasil disimpan ke Riwayat!")
+    
+    st.subheader(f"🔥 Hasil Tempaan: {hasil['nama']}")
+    col_kiri, col_kanan = st.columns([1, 2])
+    with col_kiri:
+        st.markdown("### 💡 Konsep Utama")
+        for k in hasil['konsep']:
+            st.write(f"- **{k['konsep']}** (Skor: {k['skor']:.2f})")
+    with col_kanan:
+        st.markdown("### 🕸️ Peta Jaringan Konsep")
+        if hasil['pmi']:
+            html_graf = buat_graf_konsep(hasil['pmi'], hasil['konsep'])
+            tampilkan_graf_di_streamlit(html_graf)
+            
+    if st.button("Tutup Hasil Ini & Mulai Baru"):
+        del st.session_state['hasil_baru']
+        st.rerun()
+        
+    st.divider()
 
 # === HALAMAN RIWAYAT ===
 if 'view_riwayat' in st.session_state:
@@ -160,6 +232,10 @@ if 'view_riwayat' in st.session_state:
             
             with co_tab1:
                 st.write("Ubah hasil analisis ini menjadi draf jurnal siap publikasi (Format IMRaD).")
+                
+                if Path("assets/template_jurnal.pdf").exists():
+                    st.success("✅ Template jurnal target ditemukan. AI akan meniru gaya penulisannya.")
+                
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     target_jurnal = st.text_input("Target Jurnal:", placeholder="misal: Jurnal Hukum Internasional")
@@ -213,6 +289,33 @@ if 'view_riwayat' in st.session_state:
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         type="primary"
                     )
+                    
+                    # --- FITUR KIRIM EMAIL ---
+                    st.markdown("---")
+                    st.markdown("### 📧 Kirim Laporan ke Email")
+                    email_tujuan = st.text_input("Alamat Email Tujuan:", placeholder="dosen@kampus.ac.id")
+                    
+                    if st.button("Kirim Draf Jurnal ke Email"):
+                        if email_tujuan and "@" in email_tujuan:
+                            with st.spinner("Mengirim email..."):
+                                subjek = f"Draf Jurnal Kamasan Analytics - {nama_proyek}"
+                                isi = f"Berikut adalah draf jurnal untuk proyek '{nama_proyek}' yang dihasilkan oleh Kamasan Analytics.\n\nSilakan cek lampiran."
+                                
+                                word_jurnal.seek(0)
+                                lampiran = word_jurnal.read()
+                                
+                                sukses, pesan = kirim_email_laporan(
+                                    email_tujuan, subjek, isi, 
+                                    lampiran_bytes=lampiran, 
+                                    nama_file_lampiran=f"Draf_Jurnal_{nama_file_aman}.docx"
+                                )
+                                
+                                if sukses:
+                                    st.success(pesan)
+                                else:
+                                    st.error(pesan)
+                        else:
+                            st.warning("Harap masukkan alamat email yang valid.")
             
             with co_tab2:
                 st.write("Cari referensi riil dari database akademik global (Semantic Scholar).")
@@ -236,7 +339,7 @@ if 'view_riwayat' in st.session_state:
                     
             with co_tab4:
                 st.write("Cek kemiripan draf Anda dengan riwayat analisis sebelumnya (Cosine Similarity).")
-                riwayat_lain = ambil_semua_riwayat()
+                riwayat_lain = ambil_semua_riwayat(username)
                 opsi_riwayat = {f"{r[1]} ({r[2][:10]})": r[0] for r in riwayat_lain if r[0] != id_riwayat}
                 
                 if not opsi_riwayat:
@@ -256,7 +359,7 @@ if 'view_riwayat' in st.session_state:
 
             with co_tab5:
                 st.write("Bandingkan hasil analisis ini dengan riwayat lain untuk melihat perbedaan konsep dan hubungan antar kata.")
-                riwayat_lain_banding = ambil_semua_riwayat()
+                riwayat_lain_banding = ambil_semua_riwayat(username)
                 opsi_banding = {f"{r[1]} ({r[2][:10]})": r[0] for r in riwayat_lain_banding if r[0] != id_riwayat}
                 
                 if not opsi_banding:
@@ -335,10 +438,11 @@ if 'view_riwayat' in st.session_state:
 
 # === TAB MENU ===
 if is_admin:
-    tab1, tab2, tab3, tab4 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah", "🧠 Sintesis Pengetahuan"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "📖 Kamus Istilah", "🧠 Sintesis Pengetahuan", "👥 Manajemen User"])
 else:
     tab1, tab2, tab4 = st.tabs(["📂 Unggah & Analisis", "🔍 Pencarian Kata", "🧠 Sintesis Pengetahuan"])
-    tab3 = None 
+    tab3 = None
+    tab5 = None
 
 with tab1:
     st.subheader("Unggah Dokumen & Beri Nama")
@@ -369,7 +473,7 @@ with tab1:
                         konsep_utama = ekstrak_konsep_utama(daftar_kata_per_dokumen, top_n=15)
                         hasil_pmi = hitung_pmi(semua_kata, min_cooccurrence=5)
                         
-                        simpan_analisis(nama_proyek_input, nama_file, konsep_utama, hasil_pmi)
+                        simpan_analisis(username, nama_proyek_input, nama_file, konsep_utama, hasil_pmi)
                         
                         st.session_state['hasil_baru'] = {
                             "nama": nama_proyek_input,
@@ -455,7 +559,7 @@ with tab4:
     st.subheader("🧠 Knowledge Synthesis (AI Cross-Project)")
     st.write("AI akan membaca semua riwayat penelitian Anda dan menggabungkannya untuk menemukan ide-ide baru yang inovatif.")
     
-    riwayat_semua = ambil_semua_riwayat()
+    riwayat_semua = ambil_semua_riwayat(username)
     if len(riwayat_semua) < 2:
         st.info("💡 Anda memerlukan minimal 2 riwayat analisis untuk melakukan sintesis lintas proyek.")
     else:
@@ -488,5 +592,41 @@ with tab4:
                 type="primary"
             )
 
+# === TAB 5: MANAJEMEN USER ===
+if tab5 is not None:
+    with tab5:
+        st.subheader("👥 Manajemen User")
+        
+        st.markdown("### ➕ Tambah User Baru")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            new_user = st.text_input("Username Baru:")
+        with col2:
+            new_name = st.text_input("Nama Lengkap:")
+        with col3:
+            new_role = st.selectbox("Role:", ["dosen", "admin"])
+        
+        if st.button("Tambah User"):
+            if new_user and new_name:
+                if tambah_user(new_user, new_name, "kamasan123", new_role):
+                    st.success(f"User {new_user} berhasil ditambahkan. Password standar: kamasan123")
+                    st.rerun()
+                else:
+                    st.warning("Username sudah digunakan.")
+            else:
+                st.warning("Harap isi semua kolom.")
+        
+        st.divider()
+        
+        st.markdown("### Daftar User Saat Ini")
+        users = ambil_semua_users()
+        for u in users:
+            col_info, col_hapus = st.columns([4, 1])
+            col_info.write(f"👤 **{u[0]}** ({u[1]}) - Role: {u[2]}")
+            if u[0] != "admin":
+                if col_hapus.button("Hapus 🗑️", key=f"del_user_{u[0]}"):
+                    hapus_user(u[0])
+                    st.rerun()
+
 st.divider()
-st.caption("Kamasan Analytics · Offline-first · Data tetap di perangkat Anda")
+st.caption("Kamasan Analytics · Multi-User · Data terisolasi per akun")
