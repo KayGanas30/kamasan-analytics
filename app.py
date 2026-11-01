@@ -22,7 +22,7 @@ from src.database import (init_db, simpan_analisis, ambil_semua_riwayat,
 from src.reporting import buat_laporan_word_jurnal, buat_narasi_otomatis
 from src.ai_helper import (tanya_ai_analisis, dapatkan_client_groq, 
                            buat_ringkasan_ai, kategorisasi_konsep_ai, 
-                           generate_jurnal_package, buat_paket_jurnal_lengkap,
+                           buat_paket_jurnal_lengkap,
                            pilih_opsi_dan_buat_draf, cari_referensi_riil, 
                            review_jurnal_otomatis, cek_plagiarisme_dasar,
                            sintesis_pengetahuan_lintas_proyek, kirim_email_laporan)
